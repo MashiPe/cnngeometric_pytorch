@@ -126,6 +126,10 @@ class GeometricTnf(object):
         
         sampling_grid = gridGen(theta_batch)
 
+        # print("Sampling Grid: " + self.geometric_model)
+        # print(sampling_grid.size())
+        # print(sampling_grid)
+
         # rescale grid according to crop_factor and padding_factor
         if padding_factor != 1 or crop_factor !=1:
             sampling_grid = sampling_grid*(padding_factor*crop_factor)
@@ -135,10 +139,10 @@ class GeometricTnf(object):
         
         if return_sampling_grid and not return_warped_image:
             return sampling_grid
-        
+
         # sample transformed image
-        warped_image_batch = F.grid_sample(image_batch, sampling_grid)
-        
+        warped_image_batch = F.grid_sample(image_batch, sampling_grid,align_corners=True)
+
         if return_sampling_grid and return_warped_image:
             return (warped_image_batch,sampling_grid)
         
@@ -488,7 +492,10 @@ class HomographyGridGen(Module):
         h8=H[:,8].unsqueeze(1).unsqueeze(2).unsqueeze(3)
         
         grid_X = expand_dim(self.grid_X,0,b);
+        grid_X_np = grid_X.cpu().numpy()
         grid_Y = expand_dim(self.grid_Y,0,b);
+        grid_Y_np = grid_Y.cpu().numpy()
+        # print("")
 
         grid_Xp = grid_X*h0+grid_Y*h1+h2
         grid_Yp = grid_X*h3+grid_Y*h4+h5
@@ -496,8 +503,13 @@ class HomographyGridGen(Module):
 
         grid_Xp /= k; grid_Yp /= k
         
-        return torch.cat((grid_Xp,grid_Yp),3)
-    
+        aux =  torch.cat((grid_Xp,grid_Yp),3)
+        aux_np = aux.detach().cpu().numpy()
+
+        aux1 =  torch.cat((grid_X,grid_Y),3)
+        aux1_np = aux1.detach().cpu().numpy()
+
+        return aux
 
 def homography_mat_from_4_pts(theta):
     b=theta.size(0)
@@ -528,6 +540,10 @@ def homography_mat_from_4_pts(theta):
     h=torch.cat([h,single_o],1)
     
     H = h.squeeze(2)
+
+    # print("Homografy Matrix")
+    # print(H.size())
+    # print(H)
     
     return H
 

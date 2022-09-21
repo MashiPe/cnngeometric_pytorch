@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from geotnf.transformation import homography_mat_from_4_pts
 
 
-class SynthDataset(Dataset):
+class SynthDatasetStitch(Dataset):
     """
     
     Synthetically transformed pairs dataset for training with strong supervision
@@ -129,10 +129,9 @@ class SynthDataset(Dataset):
             # theta = torch.div(theta[:8],theta[8])
         
         # permute order of image to CHW
-        image = image.transpose(1,2)
-        image = image.transpose(0,1)
+        image = image.transpose(1,2).transpose(0,1)
                 
-        # Resize image using bilinear sampling with identity affine tnf
+        # # Resize image using bilinear sampling with identity affine tnf
         if image.size()[0]!=self.out_h or image.size()[1]!=self.out_w:
             image = self.affineTnf(Variable(image.unsqueeze(0),requires_grad=False)).data.squeeze(0)
                 

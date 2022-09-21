@@ -8,14 +8,17 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from data.synth_dataset import SynthDataset
 
 from model.cnn_geometric_model import CNNGeometric
 from model.loss import TransformedGridLoss
 
-from data.synth_dataset import SynthDataset
+# from data.synth_dataset import SynthDataset
+from data.synth_dataset_stitch import SynthDatasetStitch
 from data.download_datasets import download_pascal
 
-from geotnf.transformation import SynthPairTnf
+# from geotnf.transformation import SynthPairTnf
+from geotnf.synth import SynthPairStitchTnf
 
 from image.normalization import NormalizeImageDict
 
@@ -90,14 +93,14 @@ def main():
                                    geometric_model=args.geometric_model)
 
     # Initialize Dataset objects
-    dataset = SynthDataset(geometric_model=args.geometric_model,
+    dataset = SynthDatasetStitch(geometric_model=args.geometric_model,
                dataset_csv_path=args.dataset_csv_path,
                dataset_csv_file='train.csv',
 			   dataset_image_path=args.dataset_image_path,
 			   transform=NormalizeImageDict(['image']),
 			   random_sample=args.random_sample)
 
-    dataset_val = SynthDataset(geometric_model=args.geometric_model,
+    dataset_val = SynthDatasetStitch(geometric_model=args.geometric_model,
                    dataset_csv_path=args.dataset_csv_path,
                    dataset_csv_file='val.csv',
 			       dataset_image_path=args.dataset_image_path,
@@ -105,7 +108,7 @@ def main():
 			       random_sample=args.random_sample)
 
     # Set Tnf pair generation func
-    pair_generation_tnf = SynthPairTnf(geometric_model=args.geometric_model,
+    pair_generation_tnf = SynthPairStitchTnf(geometric_model=args.geometric_model,
 				       use_cuda=use_cuda)
 
     # Initialize DataLoaders

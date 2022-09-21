@@ -36,8 +36,15 @@ def normalize_image(image, forward=True,
         std = list(std)
 
         im_size = image.size()
+        print("***** im size ****")
+        print(im_size)
         mean = torch.FloatTensor(mean).unsqueeze(1).unsqueeze(2)
+        # print("***** mean ****")
+        # print(mean)
         std = torch.FloatTensor(std).unsqueeze(1).unsqueeze(2)
+        # print("***** std ****")
+        # print(std)
+
         if image.is_cuda:
             mean = mean.cuda()
             std = std.cuda()
@@ -48,6 +55,7 @@ def normalize_image(image, forward=True,
             if len(im_size) == 3:
                 result = image.sub(mean.expand(im_size)).div(std.expand(im_size))
             elif len(im_size) == 4:
+                print(mean.unsqueeze(0).expand(im_size))
                 result = image.sub(mean.unsqueeze(0).expand(im_size)).div(std.unsqueeze(0).expand(im_size))
             else:
                 raise TypeError("Couldn't read image due to an unexpected format")

@@ -19,7 +19,8 @@ class FeatureExtraction(torch.nn.Module):
         super(FeatureExtraction, self).__init__()
         self.normalization = normalization
         if feature_extraction_cnn == 'vgg':
-            self.model = models.vgg16(pretrained=True)
+            # self.model = models.vgg16(pretrained=True)
+            self.model = models.vgg16(weights='VGG16_Weights.DEFAULT')
             # keep feature extraction network up to indicated layer
             vgg_feature_layers=['conv1_1','relu1_1','conv1_2','relu1_2','pool1','conv2_1',
                          'relu2_1','conv2_2','relu2_2','pool2','conv3_1','relu3_1',

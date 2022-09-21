@@ -9,6 +9,15 @@ datasets/
 notebooks/
 results/
 trained_models/
+.local/
+.jupyter/
 **/*.bak
 *.png
 .idea
+.cache
+.ipython
+.vscode-server
+.bash_history
+stitchedImages
+apifiles
+cache

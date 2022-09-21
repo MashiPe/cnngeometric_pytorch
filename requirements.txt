@@ -10,3 +10,9 @@ matplotlib
 requests
 tensorboard
 click
+jupyter
+shapely
+scipy
+Flask
+multipledispatch
+flask-cors

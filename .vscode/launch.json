@@ -1,0 +1,55 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: train",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: train-hom",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","hom"]
+        },
+        {
+            "name": "Python: train2-hom",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train2.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","hom"]
+        },
+        {
+            "name": "Python: test.py",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "test.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: flask",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "./api/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
