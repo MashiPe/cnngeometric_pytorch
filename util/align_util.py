@@ -12,6 +12,7 @@ from sklearn.preprocessing import normalize
 from multiprocessing import Pool
 from numba import cuda,jit
 import cv2 as cv
+from util.gpu_polygon import GPUPoly
 
 from util.polygon import Poly
 
@@ -82,12 +83,16 @@ def getImgPoints(boundBox, points):
 
     center_point = lineLineIntersection(boundBox[0],boundBox[2],boundBox[3],boundBox[1])
     
-    poly = Poly(boundBox,center_point)
+    # poly = Poly(boundBox,center_point)
 
-    # mask = np.empty(points.shape[0])
+    # # mask = np.empty(points.shape[0])
 
-    with Pool(cpu_count()) as p:
-        mask = p.starmap(parrallelCheck,zip(range(points.shape[0]),points,np.full((points.shape[0]),poly)))
+    # with Pool(cpu_count()) as p:
+    #     mask = p.starmap(parrallelCheck,zip(range(points.shape[0]),points,np.full((points.shape[0]),poly)))
+
+    poly = GPUPoly(boundBox,center_point)
+
+    mask = poly.containsPoints(points)
 
     valid_points = np.array(points[mask])
     

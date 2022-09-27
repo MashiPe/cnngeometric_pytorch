@@ -18,3 +18,4 @@ multipledispatch
 flask-cors
 cuda-python
 numba
+pyopencl
