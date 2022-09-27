@@ -122,6 +122,8 @@ def stitchImgs():
 
     url = 'http://localhost:5000/api/getimg?idusuario={}&idtour={}&escena={}&imagen={}'.format(iduser,idtour,scene,img)
 
+    print("stitch finish")
+
     # build a response dict to send back to client
     # response = {'message': 'image stitched','url': url}
 

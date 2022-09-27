@@ -21,3 +21,4 @@ trained_models/
 stitchedImages
 apifiles
 cache
+.devcontainer/

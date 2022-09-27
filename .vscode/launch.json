@@ -43,6 +43,15 @@
             "justMyCode": true
         },
         {
+            "name": "Python: random.py",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "randomtest.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: flask",
             "type": "python",
             "request": "launch",

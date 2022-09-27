@@ -16,3 +16,5 @@ scipy
 Flask
 multipledispatch
 flask-cors
+cuda-python
+numba

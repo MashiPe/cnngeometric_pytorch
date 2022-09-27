@@ -38,20 +38,25 @@ stitch_namespace = dict()
 
 def extendAxis(axis):
 
+    ext_size = len(axis)
     start = axis[0]
     end = axis[-1]
 
     dist = end-start
     step = dist / (len(axis)-1)
 
-    left_ext = np.arange(start=start,stop= (start-int(dist/2)),step=-step )
-    left_ext = left_ext[1:]
-    left_ext = np.append(left_ext,math.floor(left_ext[-1]))
+    # left_ext = np.arange(start=start,stop= (start-int(dist/2)),step=-step )
+    # left_ext = left_ext[1:]
+    
+    left_ext = np.array( [ axis[0]-step*i for i in range(1,1+ext_size//2) ] )
+
     left_ext = np.flip(left_ext)
 
-    right_ext = np.arange(start=end,stop= (end+int(dist/2)),step=step )
-    right_ext = right_ext[1:]
-    right_ext = np.append(right_ext,math.ceil(right_ext[-1]))
+    right_ext = np.array( [ axis[-1]+step*i for i in range(1,1+ext_size//2) ] )
+
+    # right_ext = np.arange(start=end,stop= (end+int(dist/2)),step=step )
+    # right_ext = right_ext[1:]
+    # right_ext = np.append(right_ext,right_ext[-1]+step)
 
     return np.concatenate([left_ext,axis,right_ext])
 

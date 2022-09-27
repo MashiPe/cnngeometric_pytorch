@@ -1,6 +1,8 @@
-FROM ubuntu:focal
+# FROM ubuntu:focal
+FROM nvidia/cuda:11.7.1-devel-ubuntu20.04
 
-RUN echo "nocache"
+ENV TZ=America/Guayaquil
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt-get update
 

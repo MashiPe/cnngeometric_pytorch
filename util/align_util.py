@@ -1,8 +1,36 @@
 import math
+from multiprocessing import shared_memory
+from multiprocessing.managers import SharedMemoryManager
+from multiprocessing.shared_memory import SharedMemory
+from os import cpu_count
+from timeit import repeat
+from xml.dom import NO_DATA_ALLOWED_ERR
 import numpy as np
 from shapely.geometry import Polygon,Point
 import scipy.ndimage as ndimage
 from sklearn.preprocessing import normalize
+from multiprocessing import Pool
+from numba import cuda,jit
+import cv2 as cv
+
+from util.polygon import Poly
+
+def lineLineIntersection(A, B, C, D):
+    # Line AB represented as a1x + b1y = c1
+    a1 = B[1] - A[1]
+    b1 = A[0] - B[0]
+    c1 = a1*(A[0]) + b1*(A[1])
+
+    # Line CD represented as a2x + b2y = c2
+    a2 = D[1] - C[1]
+    b2 = C[0] - D[0]
+    c2 = a2*(C[0]) + b2*(C[1])
+
+    determinant = a1*b2 - a2*b1
+
+    x = (b2*c1 - b1*c2)/determinant
+    y = (a1*c2 - a2*c1)/determinant
+    return [x, y]
 
 # Hmatrix is the homography as a numpy array
 # Asuming Hmatrix as form:
@@ -40,13 +68,28 @@ def maxBoundBox(Hmatrix):
 
     return boundBox
 
+def parrallelCheck(index,point,poly):
+
+    return poly.contains(point)
+    # return poly.contains(Point(point))
+
 # Takes coordinate points from a numpy array and returns points that are contained within 
 # the bounding box.
 def getImgPoints(boundBox, points):
 
-    poly = Polygon(boundBox)
+    # poly = Polygon(boundBox)
 
-    valid_points = np.array([ point for point in points if poly.contains(Point(point))])
+
+    center_point = lineLineIntersection(boundBox[0],boundBox[2],boundBox[3],boundBox[1])
+    
+    poly = Poly(boundBox,center_point)
+
+    # mask = np.empty(points.shape[0])
+
+    with Pool(cpu_count()) as p:
+        mask = p.starmap(parrallelCheck,zip(range(points.shape[0]),points,np.full((points.shape[0]),poly)))
+
+    valid_points = np.array(points[mask])
     
     return valid_points
 
@@ -67,30 +110,93 @@ def calcHomography(Hmatrix,point,inverse=False):
     hpoint /= hpoint[-1]
 
     return hpoint[:2]
-    
+
+
 def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2oneMaping = False, singleDimension = False):
 
-    newImg = np.zeros((len(H_Y_axis),len(H_X_axis),3))
+    newImg = np.empty((len(H_Y_axis),len(H_X_axis),3),dtype='float64')
+    img_points = np.empty(h_points.shape,dtype='int64')
 
-    for point in h_points:
-        inverse_point = calcHomography(Hmatrix,point,inverse=True)
+    HmatrixI = np.linalg.inv(Hmatrix)
 
-        #Calc the nearest point in the axis from the result of the inverse homography
-        inverse_point_x = np.array([min(img_X_axis, key=lambda x: abs(x-inverse_point[0]))])   
-        inverse_point_y = np.array([min(img_Y_axis, key=lambda y: abs(y-inverse_point[1]))])
-
-        #Get denormalized position from axis points
-        real_Hpoint_x = np.where(H_X_axis == point[0])[0][0]
-        real_Hpoint_y = np.where(H_Y_axis == point[1])[0][0]
-
-        real_point_x = np.where(img_X_axis == inverse_point_x[0])[0][0]
-        real_point_y = np.where(img_Y_axis == inverse_point_y[0])[0][0]
-
-        if (one2oneMaping) :
-            newImg[real_Hpoint_y,real_Hpoint_x] = img[real_point_y,real_point_x]
-        else:
-            newImg[real_Hpoint_y,real_Hpoint_x] = getSquarePoint((real_point_x,real_point_y),img,singleDimension)
+    h_points_X = h_points[:,0]
+    h_points_Y = h_points[:,1]
+    # img_points_X = h_points[:,0]
+    # h_points_Y = h_points[:,1]
     
+    test = calcHomography(Hmatrix,h_points[0],True)
+
+    h_points_XI = h_points_X*HmatrixI[0,0]+ h_points_Y*HmatrixI[0,1] + HmatrixI[0,2] 
+    h_points_YI = h_points_X*HmatrixI[1,0]+ h_points_Y*HmatrixI[1,1] + HmatrixI[1,2] 
+    k = h_points_X*HmatrixI[2,0]+ h_points_Y*HmatrixI[2,1] + HmatrixI[2,2] 
+
+    h_points_XI = h_points_XI / k
+    h_points_YI = h_points_YI / k
+
+    #Denormalization on img space
+    step_x = abs(img_X_axis[0] - img_X_axis[1])
+    min_val_x = img_X_axis[0]
+    step_y = abs(img_Y_axis[0] - img_Y_axis[1])
+    min_val_y = img_Y_axis[-1]
+
+    denor_points_X = np.around((h_points_XI - min_val_x)/step_x)
+    denor_points_Y = np.around((h_points_YI - min_val_y)/step_y)
+
+    #Denormalization on hom space
+    step_x = abs(H_X_axis[0] - H_X_axis[1])
+    min_val_x = H_X_axis[0]
+    step_y = abs(H_Y_axis[0] - H_Y_axis[1])
+    min_val_y = H_Y_axis[-1]
+
+    denor_h_points_X = np.around((h_points_X - min_val_x)/step_x)
+    denor_h_points_Y = np.around((h_points_Y - min_val_y)/step_y)
+
+    #Paring points
+    h_points[:,1]= denor_h_points_X
+    h_points[:,0]= denor_h_points_Y
+    h_points = h_points.astype(int)
+    
+    img_points[:,1]= denor_points_X
+    img_points[:,0]= denor_points_Y
+    img_points = img_points.astype(int)
+
+    #Setting corresponding values for images
+    conv_img = img
+
+    if (not one2oneMaping):
+        kernel = np.ones((3,3))/9
+        conv_img = cv.filter2D(img,-1,kernel=kernel)
+
+    if (singleDimension):
+        conv_img = np.reshape(conv_img,(conv_img.shape[0],conv_img.shape[1],-1))
+    
+    for i in range(len(h_points)):
+        # print(h_points[i],img_points[i])
+        # if (h_points[i][0] < img.shape[0] and h_points[i][1] < img.shape[1]
+        #     and img_points[i][0] < img.shape[0] and img_points[i][1] < img.shape[1]):    
+        newImg[h_points[i][0],h_points[i][1]] = conv_img[img_points[i][0],img_points[i][1]]
+
+    # H_Y_axis = np.ascontiguousarray(H_Y_axis)
+    # img_Y_axis = np.ascontiguousarray(img_Y_axis)
+    # # stream = cuda.stream()
+    # # np_aux = np.ascontiguousarray(np.zeros_like(img))
+    # aux = cuda.to_device(newImg)
+    # d_newImg = cuda.device_array_like(aux)
+    # # print(img.flags)
+    # # print(d_newImg.flags)
+    # # c_img = cuda.device_array_like(d_newImg)
+    # threadsperblock = 256
+    # blockspergrid = (d_newImg.size + (threadsperblock - 1)) // threadsperblock
+    # # cudaApplyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2oneMaping
+    # #         ,singleDimension,d_newImg)
+
+    # # test = np.arange(1000).reshape(-1,10,2)
+    # H1_matrix = np.linalg.inv(Hmatrix)
+    # cudaApplyHom[blockspergrid,threadsperblock](img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix
+    #             ,H1_matrix,one2oneMaping,singleDimension,d_newImg)
+
+    # d_newImg.copy_to_host(newImg)
+
     return newImg
 
 def getSquarePoint(center,img,singleDimension=False):
