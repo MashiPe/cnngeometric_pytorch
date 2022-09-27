@@ -1,10 +1,6 @@
 import math
-from multiprocessing import shared_memory
-from multiprocessing.managers import SharedMemoryManager
-from multiprocessing.shared_memory import SharedMemory
 from os import cpu_count
 from timeit import repeat
-from xml.dom import NO_DATA_ALLOWED_ERR
 import numpy as np
 from shapely.geometry import Polygon,Point
 import scipy.ndimage as ndimage
@@ -12,7 +8,7 @@ from sklearn.preprocessing import normalize
 from multiprocessing import Pool
 from numba import cuda,jit
 import cv2 as cv
-from util.gpu_polygon import GPUPoly
+from util.gpu_polygon import PolyV2
 
 from util.polygon import Poly
 
@@ -90,11 +86,11 @@ def getImgPoints(boundBox, points):
     # with Pool(cpu_count()) as p:
     #     mask = p.starmap(parrallelCheck,zip(range(points.shape[0]),points,np.full((points.shape[0]),poly)))
 
-    poly = GPUPoly(boundBox,center_point)
+    poly = PolyV2(boundBox,center_point)
 
-    mask = poly.containsPoints(points)
+    valid_points = poly.containsPoints(points)
 
-    valid_points = np.array(points[mask])
+    # valid_points = np.array(points[mask])
     
     return valid_points
 
@@ -128,8 +124,6 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     h_points_Y = h_points[:,1]
     # img_points_X = h_points[:,0]
     # h_points_Y = h_points[:,1]
-    
-    test = calcHomography(Hmatrix,h_points[0],True)
 
     h_points_XI = h_points_X*HmatrixI[0,0]+ h_points_Y*HmatrixI[0,1] + HmatrixI[0,2] 
     h_points_YI = h_points_X*HmatrixI[1,0]+ h_points_Y*HmatrixI[1,1] + HmatrixI[1,2] 
@@ -156,6 +150,24 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     denor_h_points_X = np.around((h_points_X - min_val_x)/step_x)
     denor_h_points_Y = np.around((h_points_Y - min_val_y)/step_y)
 
+    # Filtering edge points
+    mask = denor_points_X < img.shape[1]
+    denor_points_X = denor_points_X[mask]
+    denor_points_Y = denor_points_Y[mask]
+    denor_h_points_X = denor_h_points_X[mask]
+    denor_h_points_Y = denor_h_points_Y[mask]
+    h_points = h_points[mask]
+    img_points = img_points[mask]
+    
+    mask = denor_points_Y < img.shape[0]
+    denor_points_X = denor_points_X[mask]
+    denor_points_Y = denor_points_Y[mask]
+    denor_h_points_X = denor_h_points_X[mask]
+    denor_h_points_Y = denor_h_points_Y[mask]
+    h_points = h_points[mask]
+    img_points = img_points[mask]
+
+
     #Paring points
     h_points[:,1]= denor_h_points_X
     h_points[:,0]= denor_h_points_Y
@@ -175,10 +187,9 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     if (singleDimension):
         conv_img = np.reshape(conv_img,(conv_img.shape[0],conv_img.shape[1],-1))
     
+
     for i in range(len(h_points)):
-        # print(h_points[i],img_points[i])
-        # if (h_points[i][0] < img.shape[0] and h_points[i][1] < img.shape[1]
-        #     and img_points[i][0] < img.shape[0] and img_points[i][1] < img.shape[1]):    
+
         newImg[h_points[i][0],h_points[i][1]] = conv_img[img_points[i][0],img_points[i][1]]
 
     # H_Y_axis = np.ascontiguousarray(H_Y_axis)
@@ -201,7 +212,7 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     #             ,H1_matrix,one2oneMaping,singleDimension,d_newImg)
 
     # d_newImg.copy_to_host(newImg)
-
+    print('wrapping finish')
     return newImg
 
 def getSquarePoint(center,img,singleDimension=False):

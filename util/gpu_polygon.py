@@ -2,7 +2,7 @@ import pyopencl as cl
 import numpy as np
 
 
-class GPUPoly:
+class PolyV2:
 
     kernel_src = """
                     __kernel void check( float *a,  float *b, float *c , int *dir 
@@ -64,18 +64,18 @@ class GPUPoly:
         self.list_c = np.array(self.list_c,dtype=np.float32) 
         self.list_direction = np.array(self.list_direction,dtype=np.int32)
 
-        self.ctx = cl.create_some_context()
-        self.queue = cl.CommandQueue(self.ctx)
+        # self.ctx = cl.create_some_context()
+        # self.queue = cl.CommandQueue(self.ctx)
 
-        self.prg = cl.Program(self.ctx,self.kernel_src).build()
+        # self.prg = cl.Program(self.ctx,self.kernel_src).build()
 
 
     def _genInecParams(self,A,B):
         
-        # Line AB represented as a1x + b1y -c1 = 0
-        a1 = B[1] - A[1]
-        b1 = A[0] - B[0]
-        c1 = (a1*(A[0]) + b1*(A[1]))*-1
+        # Line AB represented as a1x + b1y +c1 = 0
+        a1 = A[1] - B[1]
+        b1 = B[0] - A[0]
+        c1 = -1*(a1*A[0] + b1*A[0])
 
         aux = (a1*self.ref_point[0])+(b1*self.ref_point[1])+c1
 
@@ -84,9 +84,9 @@ class GPUPoly:
         if aux > 0:
             d=0
         
-        return a1,b1,b1,d
+        return a1,b1,c1,d
 
-    def containsPoints(self,points):
+    def containsPointsCL(self,points):
 
         mf = cl.mem_flags
 
@@ -113,3 +113,29 @@ class GPUPoly:
         res_mask = [ x==1 for x in res_mask ]
 
         return res_mask
+    
+    def containsPoints(self,points):
+        
+        Px = points[:,0]
+        Py = points[:,1]
+
+        for i in range(len(self.list_a)):
+
+            aux_Px = Px * self.list_a[i]
+            aux_Py = Py * self.list_b[i]
+
+            aux_res = aux_Px + aux_Py + self.list_c[i]
+
+            if ( self.list_direction[i] == 0 ):
+                mask = aux_res > 0
+            else:
+                mask = aux_res < 0
+
+            Px = Px[mask]
+            Py = Py[mask]
+
+        valid_points = np.empty((len(Px),2))
+        valid_points[:,0] = Px
+        valid_points[:,1] = Py
+
+        return valid_points

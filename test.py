@@ -39,7 +39,7 @@ def main():
 
     # Extracting src img
     img_src = aux_img_src[y_offset:y_offset+img_h,x_offset:x_offset+img_w]
-    # cv.imwrite("src.jpg",img_src)
+    cv.imwrite("src.jpg",img_src)
     img_src = cv.resize(img_src,(240,240))
 
     # cropped_image_batch[i] = torch.Tensor(img_src.astype(np.float32)).transpose(1,2).transpose(0,1)
@@ -102,7 +102,7 @@ def main():
     aux_img_trg_H=aling.applyHom(aux_img_trg,h_points,H_X_axis,np.flip(H_Y_axis),X_axis,np.flip(Y_axis),M)
 
 
-    # cv.imwrite("aux_trg.jpg",aux_img_trg_H)
+    cv.imwrite("aux_trg.jpg",aux_img_trg_H)
 
 
     #Flip Y axis to denormalize points
@@ -170,7 +170,7 @@ def main():
 
     #Extract trg img
     trg_img = aux_img_trg_H[start_point[1]:start_point[1]+img_h,start_point[0]:start_point[0]+img_w]
-    # cv.imwrite("trg.jpg",trg_img)
+    cv.imwrite("trg.jpg",trg_img)
     trg_img = cv.resize(trg_img,(240,240))
 
 

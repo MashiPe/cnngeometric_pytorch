@@ -32,16 +32,16 @@ class Poly:
     
     def _genInec(self,A,B):
         
-        # Line AB represented as a1x + b1y -c1 = 0
-        a1 = B[1] - A[1]
-        b1 = A[0] - B[0]
-        c1 = (a1*(A[0]) + b1*(A[1]))*-1
+        # Line AB represented as a1x + b1y +c1 = 0
+        a1 = A[1] - B[1]
+        b1 = B[0] - A[0]
+        c1 = -1*(a1*A[0] + b1*A[0])
 
 
         if (self._rightInec(a1,b1,c1,self.ref_point)):
-            return (a1,b1,c1,self._rightInec)
+            return (a1,b1,c1,1,self._rightInec)
         
-        return (a1,b1,c1,self._leftInec)
+        return (a1,b1,c1,0,self._leftInec)
 
     def contains(self,point):
 

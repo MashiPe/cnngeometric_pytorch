@@ -18,19 +18,23 @@ RUN apt-get install ffmpeg libsm6 libxext6 -y
 
 RUN apt install -y git
 
-RUN apt install -y unzip \
+RUN apt install -y apt-utils unzip \
     tar \
     curl \
     xz-utils \
     ocl-icd-libopencl1 \
     opencl-headers \
     clinfo \
+    ocl-icd-opencl-dev \
     ;
 
 RUN mkdir -p /etc/OpenCL/vendors && \
     echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
 RUN apt install python3-pip -y
+
+ENV NVIDIA_VISIBLE_DEVICE all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 
 RUN pip install -r requirements.txt
 
