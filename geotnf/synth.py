@@ -21,6 +21,7 @@ from random import random,randint
 import math
 import cv2 as cv
 from stitching.stitch import extendAxis
+import time
 
 
 class SynthPairStitchTnf(object):
@@ -57,9 +58,7 @@ class SynthPairStitchTnf(object):
         warped_image_batch = torch.empty(batch_shape)
         theta_image_batch = torch.empty(thetas_batch.size())
 
-        print('Generating batch images')
         for i in range(images_batch.size(dim=0)):
-            print('Generating img{}'.format(i))
             image_batch = images_batch[i]
             theta_batch = thetas_batch[i]            
 
@@ -225,9 +224,6 @@ class SynthPairStitchTnf(object):
             warped_image_batch[i] = Variable(warped_image_batch[i],requires_grad=False)
 
             theta_image_batch[i] = theta_batch
-
-            print('Finished img{}'.format(i))
-
 
         if self.use_cuda:
             cropped_image_batch = cropped_image_batch.cuda()

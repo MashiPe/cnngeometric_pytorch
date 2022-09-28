@@ -151,13 +151,14 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     denor_h_points_Y = np.around((h_points_Y - min_val_y)/step_y)
 
     # Filtering edge points
-    mask = denor_points_X < img.shape[1]
+    mask = denor_points_X < img.shape[1] 
     denor_points_X = denor_points_X[mask]
     denor_points_Y = denor_points_Y[mask]
     denor_h_points_X = denor_h_points_X[mask]
     denor_h_points_Y = denor_h_points_Y[mask]
     h_points = h_points[mask]
     img_points = img_points[mask]
+
     
     mask = denor_points_Y < img.shape[0]
     denor_points_X = denor_points_X[mask]
@@ -167,6 +168,22 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     h_points = h_points[mask]
     img_points = img_points[mask]
 
+    mask = denor_points_X > 0 
+    denor_points_X = denor_points_X[mask]
+    denor_points_Y = denor_points_Y[mask]
+    denor_h_points_X = denor_h_points_X[mask]
+    denor_h_points_Y = denor_h_points_Y[mask]
+    h_points = h_points[mask]
+    img_points = img_points[mask]
+
+    
+    mask = denor_points_Y > 0
+    denor_points_X = denor_points_X[mask]
+    denor_points_Y = denor_points_Y[mask]
+    denor_h_points_X = denor_h_points_X[mask]
+    denor_h_points_Y = denor_h_points_Y[mask]
+    h_points = h_points[mask]
+    img_points = img_points[mask]
 
     #Paring points
     h_points[:,1]= denor_h_points_X
@@ -212,7 +229,6 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
     #             ,H1_matrix,one2oneMaping,singleDimension,d_newImg)
 
     # d_newImg.copy_to_host(newImg)
-    print('wrapping finish')
     return newImg
 
 def getSquarePoint(center,img,singleDimension=False):
