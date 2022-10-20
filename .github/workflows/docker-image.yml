@@ -14,8 +14,8 @@ jobs:
 
     steps:
      - name: Push dockerhub
-     - uses: mr-smithers-excellent/docker-build-push@v5
-     - with:
+       uses: mr-smithers-excellent/docker-build-push@v5
+       with:
         image: seaman69/3dspace
         tags: stitching
         registry: docker.io
