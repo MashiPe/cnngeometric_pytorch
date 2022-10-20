@@ -31,10 +31,10 @@ RUN apt install -y apt-utils unzip \
 RUN mkdir -p /etc/OpenCL/vendors && \
     echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
-RUN apt install python3-pip -y
-
 ENV NVIDIA_VISIBLE_DEVICE all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+
+RUN apt install python3-pip -y
 
 RUN pip install -r requirements.txt
 
@@ -52,3 +52,9 @@ RUN groupadd --system --gid ${GROUP_ID} marcelo && \
     useradd --system --uid ${USER_ID} --gid marcelo -m --shell /bin/bash marcelo
 
 # CMD ["jupyter","notebook"]
+
+COPY  . /app
+
+WORKDIR /app
+
+CMD [ "python3","./api/main.py" ]
