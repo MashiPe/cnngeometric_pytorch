@@ -28,6 +28,7 @@ endNormSpace = 1
 
 USE_CUDA = torch.cuda.is_available()
 MODEL_PATH = 'trained_models/best_streetview_checkpoint_adam_hom_grid_loss_PAMI_usefull.pth.tar'
+# MODEL_PATH = 'trained_models/checkpoint_adam/checkpoint_adam_hom_grid_lossvgg.pth.tar'
 model_hom = None
 
 resize_cnn = GeometricTnf(out_h=240, out_w=240, use_cuda = False) 
@@ -215,6 +216,8 @@ def stitch(imgArray: List[str],dest) -> np.array:
 
         auxImg = blend.fitInSpace(auxImg,newImgSpace,(out_h,out_w),(0,1))
         auxWeights = blend.fitInSpace(auxWeights,newImgSpace,(out_h,out_w),(0,1))
+        
+        cv.imwrite("midle_img.jpg",auxImg)
 
         imgStack.append(auxImg)
         weightStack.append(auxWeights)
@@ -273,7 +276,7 @@ def stitch(imgArray: List[str],dest) -> np.array:
 
         resized = cv.resize(blendedImg,(x_dim,y_dim))
 
-        filePath = path.join(dest,'result.jpg')
+        filePath = path.join(dest,'result.png')
 
         cv.imwrite(filePath,resized)
 

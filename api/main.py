@@ -7,11 +7,14 @@ from flask_cors import CORS
 from os import listdir, path, makedirs
 import sys
 import numpy as np
+import uuid
 
 sys.path.append(str(Path.cwd()))
 
 from stitching.stitch import stitch
 from api.utils.zip_utils import unzipFiles
+from werkzeug.serving import WSGIRequestHandler
+
 
 home = str(Path.cwd())
 
@@ -23,6 +26,9 @@ print(home)
 if (not path.isdir(home)):
     makedirs(home)
 
+
+# HOSTNAME = 'http://redpanda.sytes.net'
+HOSTNAME = 'http://173.255.114.112'
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
@@ -60,12 +66,10 @@ def saveImages():
     zipFile = request.files['file']
     
     idUser = request.args['idusuario']
-    idTour = request.args['idtour']
+    scanId = request.args['scanid']
     name = request.args['nombre']
-    scene = request.args['escena']
-    img = request.args['imagen']
 
-    savePath = path.join(home,'zips',idUser,idTour,scene,img)
+    savePath = path.join(home,'zips',idUser,scanId)
 
     if (not path.exists(savePath)):
         makedirs(savePath)
@@ -79,19 +83,16 @@ def saveImages():
 
     return jsonify({'message':'zip received','path':savePath})
 
-
 @app.route('/api/stitch', methods=['POST'])
 def stitchImgs():
     
     print('procecssing images')
     
     iduser = request.args['idusuario']
-    idtour = request.args['idtour']
-    scene = request.args['escena']
-    img = request.args['imagen']
+    scanId = request.args['scanid']
 
-    zip_folder = path.join(home,'zips',iduser,idtour,scene,img)
-    imgs_folder = path.join(home,'uncompressed',iduser,idtour,scene,img)
+    zip_folder = path.join(home,'zips',iduser,scanId)
+    imgs_folder = path.join(home,'uncompressed',scanId)
 
     if (not path.exists(imgs_folder)):
         makedirs(imgs_folder)
@@ -105,35 +106,28 @@ def stitchImgs():
 
     file_paths = [ path.join(imgs_folder,f) for f in file_paths]
 
-# files = request.files.getlist('files')
-    # print(files)
-    # file_paths = []
-
-    # for file in files:
-    #     filename = file.filename
-    #     fullPath = path.join(home,filename)
-    #     file_paths.append(fullPath)
-    #     file.save(fullPath)
-    #     print(fullPath)
-
-    dest_folder = path.join('/images',iduser,idtour,scene,img)
+    dest_folder = path.join(home,'stitchedimgs',iduser,scanId)
 
     filePath = stitch(file_paths,dest_folder)
 
-    url = 'http://localhost:5000/api/getimg?idusuario={}&idtour={}&escena={}&imagen={}'.format(iduser,idtour,scene,img)
+    url = '{}:5000/api/getimg?idusuario={}&scanid={}'.format(HOSTNAME,iduser,scanId)
 
     print("stitch finish")
 
-    # build a response dict to send back to client
-    # response = {'message': 'image stitched','url': url}
+    return jsonify( { 'url':url } )
 
-    # return jsonify(response)
+@app.route('/api/getimg')
+def getimg():
 
-    return send_file(filePath,mimetype='image/png')
+    iduser = request.args['idusuario']
+    scanid = request.args['scanid']
 
+    imgPath = path.join(home,'stitchedimgs',iduser,scanid,'result.png')
+
+    return send_file(imgPath, mimetype='image/png')
 
 @app.route('/api/tours/getresultado')
-def myapp():
+def getresultado():
 
     iduser = request.args['idusuario']
     idtour = request.args['idtour']
@@ -143,6 +137,9 @@ def myapp():
     imgPath = path.join('/images',iduser,idtour,scene,img,'result.jpg')
 
     return send_file(imgPath, mimetype='image/png')
+
+
+WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
 # start flask app
 app.run(host="0.0.0.0", port=5000)

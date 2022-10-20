@@ -115,8 +115,8 @@ def calcHomography(Hmatrix,point,inverse=False):
 
 def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2oneMaping = False, singleDimension = False):
 
-    newImg = np.empty((len(H_Y_axis),len(H_X_axis),3),dtype='float64')
-    img_points = np.empty(h_points.shape,dtype='int64')
+    newImg = np.zeros((len(H_Y_axis),len(H_X_axis),3),dtype='float64')
+    img_points = np.zeros(h_points.shape,dtype='int64')
 
     HmatrixI = np.linalg.inv(Hmatrix)
 
@@ -209,26 +209,6 @@ def applyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2on
 
         newImg[h_points[i][0],h_points[i][1]] = conv_img[img_points[i][0],img_points[i][1]]
 
-    # H_Y_axis = np.ascontiguousarray(H_Y_axis)
-    # img_Y_axis = np.ascontiguousarray(img_Y_axis)
-    # # stream = cuda.stream()
-    # # np_aux = np.ascontiguousarray(np.zeros_like(img))
-    # aux = cuda.to_device(newImg)
-    # d_newImg = cuda.device_array_like(aux)
-    # # print(img.flags)
-    # # print(d_newImg.flags)
-    # # c_img = cuda.device_array_like(d_newImg)
-    # threadsperblock = 256
-    # blockspergrid = (d_newImg.size + (threadsperblock - 1)) // threadsperblock
-    # # cudaApplyHom(img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix,one2oneMaping
-    # #         ,singleDimension,d_newImg)
-
-    # # test = np.arange(1000).reshape(-1,10,2)
-    # H1_matrix = np.linalg.inv(Hmatrix)
-    # cudaApplyHom[blockspergrid,threadsperblock](img,h_points,H_X_axis,H_Y_axis,img_X_axis,img_Y_axis,Hmatrix
-    #             ,H1_matrix,one2oneMaping,singleDimension,d_newImg)
-
-    # d_newImg.copy_to_host(newImg)
     return newImg
 
 def getSquarePoint(center,img,singleDimension=False):
