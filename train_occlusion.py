@@ -8,17 +8,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from data.synth_dataset import SynthDataset
 
 from model.cnn_geometric_model import CNNGeometric
 from model.loss import TransformedGridLoss
 
-# from data.synth_dataset import SynthDataset
-from data.synth_dataset_stitch import SynthDatasetStitch
+from data.synth_dataset_occlusion import SynthDatasetOcl
 from data.download_datasets import download_pascal
 
-# from geotnf.transformation import SynthPairTnf
-from geotnf.synth import SynthPairStitchTnf
+from geotnf.transformation import SynthPairTnf
 
 from image.normalization import NormalizeImageDict
 
@@ -42,10 +39,6 @@ def main():
 
     use_cuda = torch.cuda.is_available()
     device = torch.device('cuda') if use_cuda else torch.device('cpu')
-
-    print("Cuda Available")
-    print(use_cuda)
-
     # Seed
     torch.manual_seed(args.seed)
     if use_cuda:
@@ -97,14 +90,14 @@ def main():
                                    geometric_model=args.geometric_model)
 
     # Initialize Dataset objects
-    dataset = SynthDatasetStitch(geometric_model=args.geometric_model,
+    dataset = SynthDatasetOcl(geometric_model=args.geometric_model,
                dataset_csv_path=args.dataset_csv_path,
                dataset_csv_file='train.csv',
 			   dataset_image_path=args.dataset_image_path,
 			   transform=NormalizeImageDict(['image']),
 			   random_sample=args.random_sample)
 
-    dataset_val = SynthDatasetStitch(geometric_model=args.geometric_model,
+    dataset_val = SynthDatasetOcl(geometric_model=args.geometric_model,
                    dataset_csv_path=args.dataset_csv_path,
                    dataset_csv_file='val.csv',
 			       dataset_image_path=args.dataset_image_path,
@@ -112,7 +105,7 @@ def main():
 			       random_sample=args.random_sample)
 
     # Set Tnf pair generation func
-    pair_generation_tnf = SynthPairStitchTnf(geometric_model=args.geometric_model,
+    pair_generation_tnf = SynthPairTnf(geometric_model=args.geometric_model,
 				       use_cuda=use_cuda)
 
     # Initialize DataLoaders
@@ -140,20 +133,20 @@ def main():
         ckpt = args.trained_model_fn + '_' + args.geometric_model + '_mse_loss' + args.feature_extraction_cnn
         checkpoint_path = os.path.join(args.trained_model_dir,
                                        args.trained_model_fn,
-                                       ckpt + '.pth.tar')
+                                       ckpt + '_occluded.pth.tar')
     else:
         ckpt = args.trained_model_fn + '_' + args.geometric_model + '_grid_loss' + args.feature_extraction_cnn
         checkpoint_path = os.path.join(args.trained_model_dir,
                                        args.trained_model_fn,
-                                       ckpt + '.pth.tar')
+                                       ckpt + '_occluded.pth.tar')
     if not os.path.exists(args.trained_model_dir):
         os.mkdir(args.trained_model_dir)
 
     # Set up TensorBoard writer
     if not args.log_dir:
-        tb_dir = os.path.join(args.trained_model_dir, args.trained_model_fn + '_tb_logs')
+        tb_dir = os.path.join(args.trained_model_dir, args.trained_model_fn + '_occluded_tb_logs')
     else:
-        tb_dir = os.path.join(args.log_dir, args.trained_model_fn + '_tb_logs')
+        tb_dir = os.path.join(args.log_dir, args.trained_model_fn + '_occluded_tb_logs')
 
     logs_writer = SummaryWriter(tb_dir)
     # add graph, to do so we have to generate a dummy input to pass along with the graph

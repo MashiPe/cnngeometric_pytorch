@@ -31,7 +31,21 @@
             "program": "train2.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--geometric-model","hom"]
+            "args": ["--geometric-model","hom","--num-epochs","10", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101"]
+        },
+        {
+            "name": "Python: train-occlusion-hom",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train_occlusion.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","hom","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
         },
         {
             "name": "Python: test.py",

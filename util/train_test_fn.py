@@ -26,7 +26,6 @@ def train(epoch, model, loss_fn, optimizer,
     train_loss = 0
     for batch_idx, batch in enumerate(tqdm(dataloader, desc='Epoch {}'.format(epoch))):
         
-        print("Starting batch")
         optimizer.zero_grad()
         tnf_batch = pair_generation_tnf(batch)
         theta = model(tnf_batch)
