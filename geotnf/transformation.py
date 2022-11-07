@@ -11,6 +11,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from util.torch_util import expand_dim
 from image.normalization import normalize_image
+import math
 
 class ComposedGeometricTnf(object):
     """
@@ -490,6 +491,15 @@ class HomographyGridGen(Module):
         h6=H[:,6].unsqueeze(1).unsqueeze(2).unsqueeze(3)
         h7=H[:,7].unsqueeze(1).unsqueeze(2).unsqueeze(3)
         h8=H[:,8].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        # h0=H[0]
+        # h1=H[1]
+        # h2=H[2]
+        # h3=H[3]
+        # h4=H[4]
+        # h5=H[5]
+        # h6=H[6]
+        # h7=H[7]
+        # h8=H[8]
         
         grid_X = expand_dim(self.grid_X,0,b);
         grid_X_np = grid_X.cpu().numpy()
@@ -685,3 +695,67 @@ class TpsGridGen(Module):
         
         return torch.cat((points_X_prime,points_Y_prime),3)
         
+
+
+
+def flex_grid_sample(image,grid,real_h=240,real_w=240):
+
+
+    iw = grid.shape[1]
+    ih = grid.shape[0]
+    c = image.shape[2]
+
+    out_h = grid.shape[0]
+    out_w = grid.shape[1]
+
+    # points = grid.reshape((-1-1,2))
+    
+    ix = grid[:,:,0]
+    iy = grid[:,:,1]
+
+
+    output = np.zeros((out_h,out_w,c))
+    
+    ix = ( (ix+1)/2 )*real_w
+    iy = ( (iy+1)/2 )*real_h
+
+    # np.savetxt("ix-{}.csv".format(iw),ix,delimiter=",")    
+    # np.savetxt("iy-{}.csv".format(ih),iy,delimiter=",")    
+        
+    # ix = ((ix + 1 )/2)*(iw-1)
+    # iy = ((iy + 1 )/2)*(ih-1)
+
+    ix_nw = np.floor(ix)
+    iy_nw = np.floor(iy)
+    ix_ne = ix_nw +1 
+    iy_ne = iy_nw
+    ix_sw = ix_nw
+    iy_sw = iy_nw + 1
+    ix_se = ix_nw + 1 
+    iy_se = iy_nw + 1
+
+    nw = (ix_se - ix)    * (iy_se - iy);
+    ne = (ix - ix_sw) * (iy_sw - iy);
+    sw = (ix_ne - ix)    * (iy    - iy_ne);
+    se = (ix    - ix_nw) * (iy    - iy_nw);    
+
+    for h in range(ih):
+        for w in range(iw):
+
+            nw_val = (image[int(ix_nw[h,w]),int(iy_nw[h,w])] if int(ix_nw[h,w])>=0 and int(ix_nw[h,w])<real_w and  
+                            int(iy_nw[h,w])>=0 and int(iy_nw[h,w])<real_h else np.zeros((c)))
+
+            ne_val = (image[int(ix_ne[h,w]),int(iy_ne[h,w])] if int(ix_ne[h,w])>=0 and int(ix_ne[h,w])<real_w and  
+                            int(iy_ne[h,w])>=0 and int(iy_ne[h,w])<real_h else np.zeros((c)))
+
+            sw_val = (image[int(ix_sw[h,w]),int(iy_sw[h,w])] if int(ix_sw[h,w])>=0 and int(ix_sw[h,w])<real_w and
+                            int(iy_sw[h,w])>=0 and int(iy_sw[h,w])<real_h else np.zeros((c)))
+
+            se_val = (image[int(ix_se[h,w]),int(iy_se[h,w])] if int(ix_se[h,w])>=0 and int(ix_se[h,w])<real_w and
+                            int(iy_se[h,w])>=0 and int(iy_se[h,w])<real_h else np.zeros((c)))
+
+            out_val = nw_val * nw[h,w] +ne_val*ne[h,w] + sw_val * sw[h,w] + se_val*se[h,w]
+
+            output[h,w] = out_val
+
+    return output

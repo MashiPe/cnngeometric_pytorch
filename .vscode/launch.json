@@ -48,6 +48,30 @@
                     "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
         },
         {
+            "name": "Python: train-occlusion-affine",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train_occlusion.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","affine","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
+        },
+        {
+            "name": "Python: train-occlusion-tps",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train_occlusion.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","tps","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
+        },
+        {
             "name": "Python: test.py",
             "type": "python",
             "request": "launch",

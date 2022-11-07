@@ -11,10 +11,11 @@ import uuid
 
 sys.path.append(str(Path.cwd()))
 
-from stitching.stitch import stitch
+from stitching.stitch import stitch, ImageStitcher
 from api.utils.zip_utils import unzipFiles
 from werkzeug.serving import WSGIRequestHandler
 
+stitcher = ImageStitcher('tps','resnet101','occlusion')
 
 home = str(Path.cwd())
 
@@ -27,6 +28,7 @@ if (not path.isdir(home)):
     makedirs(home)
 
 
+
 # HOSTNAME = 'http://redpanda.sytes.net'
 HOSTNAME = 'http://173.255.114.112'
 
@@ -35,7 +37,6 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = home
 
 CORS(app)
-
 @app.route('/api/test/stitch', methods=['POST'])
 def test():
     
@@ -108,7 +109,9 @@ def stitchImgs():
 
     dest_folder = path.join(home,'stitchedimgs',iduser,scanId)
 
-    filePath = stitch(file_paths,dest_folder)
+    # filePath = stitch(file_paths,dest_folder)
+
+    filePath = stitcher.stitch(file_paths,dest_folder)
 
     url = '{}:5000/api/getimg?idusuario={}&scanid={}'.format(HOSTNAME,iduser,scanId)
 

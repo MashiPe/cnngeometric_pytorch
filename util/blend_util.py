@@ -13,12 +13,12 @@ from util.align_util import NormalizeData
 
 def genWieghts(width,height):
     
-    w_map = np.zeros((height,width,1))
+    w_map = np.zeros((height,width,3))
 
-    w_map[:height,0] = [1]
-    w_map[:height,-1] = [1]
-    w_map[0,:width] = [1]
-    w_map[-1,:width] = [1]
+    w_map[:height,0] = [1,1,1]
+    w_map[:height,-1] = [1,1,1]
+    w_map[0,:width] = [1,1,1]
+    w_map[-1,:width] = [1,1,1]
 
     # print(w_map[:height,0])
 
@@ -77,7 +77,7 @@ def calcNewSpace(imgShape: np.array, numImg: int) -> np.array:
     return np.array( [height,width,imgShape[-1]] )
 
 
-#Fits the image on the new space asuming thirds for height and width that difers by half the out dimensions
+#Fits the image on the new space assuming thirds for height and width that difers by half of the out dimensions
 # The coords refers to the imaginary cuadrants on the space 
 def fitInSpace(img: np.array, spaceShape: np.array, outDimensions: List, coords: List) -> np.array:
 

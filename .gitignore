@@ -22,3 +22,5 @@ stitchedImages
 apifiles
 cache
 .devcontainer/
+*.jpg
+*.csv
