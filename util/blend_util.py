@@ -67,9 +67,12 @@ def blendImgs(img_stack,w_stack,outDim):
     return newImg
 
 
-def calcNewSpace(imgShape: np.array, numImg: int) -> np.array:
+def calcNewSpace(imgShape: np.ndarray, numImg: int,x_axis_only:bool=False) -> np.ndarray:
 
-    numStrips = math.ceil(numImg / 3) 
+    numStrips = math.ceil(numImg / 3) #Assuming 3 photos per strip
+
+    if x_axis_only:
+        numStrips = numImg
 
     height = imgShape[0] * 3 
     width = ((imgShape[1]//2) * (numStrips+1)) + imgShape[1]
@@ -77,7 +80,7 @@ def calcNewSpace(imgShape: np.array, numImg: int) -> np.array:
     return np.array( [height,width,imgShape[-1]] )
 
 
-#Fits the image on the new space assuming thirds for height and width that difers by half of the out dimensions
+#Fits the image in the new space assuming thirds for height and width that difers by half of the out dimensions
 # The coords refers to the imaginary cuadrants on the space 
 def fitInSpace(img: np.array, spaceShape: np.array, outDimensions: List, coords: List) -> np.array:
 
@@ -92,3 +95,18 @@ def fitInSpace(img: np.array, spaceShape: np.array, outDimensions: List, coords:
     newImg[y_start:y_end,x_start:x_end] = img
 
     return newImg
+
+#Crops the image from space assuming thirds for height and width that difers by half of the out dimensions
+# The coords refers to the imaginary cuadrants on the space 
+# crop_shape the ammount of extra image for the crop
+def cropFromSpace(img: np.array,cropShape: List ,outDimensions: List, coords: List) -> np.array:
+
+    y_start = coords[1]*(outDimensions[0]//2)
+    y_end = y_start+(cropShape[0])
+
+    x_start = coords[0]*(outDimensions[1]//2)
+    x_end = x_start+(cropShape[1])
+
+    crop_img = img[y_start:y_end,x_start:x_end]
+
+    return crop_img

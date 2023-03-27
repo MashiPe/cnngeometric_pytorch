@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Variable
 import numpy as np
-from geotnf.grid_gen import TpsGridGen
+from geotnf.transformation import TpsGridGenV2
 from geotnf.transformation import homography_mat_from_4_pts
 
 def normalize_axis(x,L):
@@ -16,11 +16,15 @@ class PointTnf(object):
     Class with functions for transforming a set of points with affine/tps transformations
     
     """
-    def __init__(self, tps_grid_size=3, tps_reg_factor=0, use_cuda=True):
+    def __init__(self, tps_reg_factor=0, use_cuda=True,reg_grid_tps=True,
+                x_axis_coords=None,y_axis_coords=None):
         self.use_cuda=use_cuda
-        self.tpsTnf = TpsGridGen(grid_size=tps_grid_size,
+        self.tpsTnf = TpsGridGenV2(
                                  reg_factor=tps_reg_factor,
-                                 use_cuda=self.use_cuda)   
+                                 use_cuda=self.use_cuda,
+                                 use_regular_grid=reg_grid_tps,
+                                 x_axis_coords=x_axis_coords,
+                                 y_axis_coords=y_axis_coords) 
     
 
     def tpsPointTnf(self,theta,points):

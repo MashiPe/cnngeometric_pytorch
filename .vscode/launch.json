@@ -40,7 +40,7 @@
             "type": "python",
             "request": "launch",
             // "program": "${file}",
-            "program": "train_occlusion.py",
+            "program": "train_strong.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["--geometric-model","hom","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
@@ -52,10 +52,22 @@
             "type": "python",
             "request": "launch",
             // "program": "${file}",
-            "program": "train_occlusion.py",
+            "program": "train_strong.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["--geometric-model","affine","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
+        },
+        {
+            "name": "Python: train-affine-translate",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train_occlusion.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","affine","--translation-only","False","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
                     ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
                     "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
         },
@@ -70,6 +82,36 @@
             "args": ["--geometric-model","tps","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
                     ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
                     "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models"]
+        },
+        {
+            "name": "Python: train-8points-tps",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train_strong.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","tps","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models","--reg-grid","False",
+                    "--x-axis-coords","-1.0","-1.0","-1.0","0.0","0.0","1.0","1.0","1.0",
+                    "--y-axis-coords","-1.0","0.0","1.0","-1.0","1.0","-1.0","0.0","1.0",
+                    "--partial-occlusion","True"]
+        },
+        {
+            "name": "Python: train-8points-tps-partial-occlusion",
+            "type": "python",
+            "request": "launch",
+            // "program": "${file}",
+            "program": "train_strong.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--geometric-model","tps","--num-epochs","20", "--training-dataset","streetview","--log_interval","50"
+                    ,"--dataset-csv-path","training_data/streetview-random","--dataset-image-path","datasets",
+                    "--feature-extraction-cnn","resnet101","--trained-model-dir","trained_models","--reg-grid","False",
+                    "--x-axis-coords","-1.0","-1.0","-1.0","0.0","0.0","1.0","1.0","1.0",
+                    "--y-axis-coords","-1.0","0.0","1.0","-1.0","1.0","-1.0","0.0","1.0",
+                    "--partial-occlusion","True","--pretrained-model","trained_models/checkpoint_adam/best_checkpoint_adam_tps_grid_lossresnet101_no_occ.pth.tar"]
         },
         {
             "name": "Python: test.py",

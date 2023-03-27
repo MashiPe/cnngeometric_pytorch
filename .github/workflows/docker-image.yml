@@ -18,8 +18,8 @@ jobs:
      - name: Push dockerhub
        uses: mr-smithers-excellent/docker-build-push@v5
        with:
-        image: seaman69/3dspace
-        tags: stitching
+        image: 3dspace/microstitching
+        tags: latest
         registry: docker.io
         username: ${{secrets.DOCKER_MAIL}}
         password: ${{secrets.DOCKER_PASSWD}}

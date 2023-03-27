@@ -6,7 +6,8 @@ from torch.autograd import Variable
 from geotnf.point_tnf import PointTnf
 
 class TransformedGridLoss(nn.Module):
-    def __init__(self, geometric_model='affine', use_cuda=True, grid_size=20):
+    def __init__(self, geometric_model='affine', use_cuda=True, grid_size=20,reg_grid_tps=True,
+                x_axis_coords=None,y_axis_coords=None):
         super(TransformedGridLoss, self).__init__()
         self.geometric_model = geometric_model
         # define virtual grid of points to be transformed
@@ -17,7 +18,8 @@ class TransformedGridLoss(nn.Module):
         Y = np.reshape(Y,(1,1,self.N))
         P = np.concatenate((X,Y),1)
         self.P = Variable(torch.FloatTensor(P),requires_grad=False)
-        self.pointTnf = PointTnf(use_cuda=use_cuda)
+        self.pointTnf = PointTnf(use_cuda=use_cuda,reg_grid_tps=reg_grid_tps,
+                        x_axis_coords=x_axis_coords,y_axis_coords=y_axis_coords)
         if use_cuda:
             self.P = self.P.cuda();
 

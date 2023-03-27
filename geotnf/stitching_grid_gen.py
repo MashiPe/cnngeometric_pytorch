@@ -63,15 +63,19 @@ class StitchingAffineGridGen(Module):
         self.img_h, self.img_w = img_h, img_w
         self.use_cuda = use_cuda
 
-        grid_X,grid_Y = genFlexPoints(img_h,img_w)
+        # grid_X,grid_Y = genFlexPoints(img_h,img_w)
+        self.grid_X,self.grid_Y = np.meshgrid(np.linspace(-1,1,out_w),np.linspace(-1,1,out_h))
+        # grid_X,grid_Y: size [1,H,W,1,1]
+        self.grid_X = torch.FloatTensor(self.grid_X).unsqueeze(0).unsqueeze(3)
+        self.grid_Y = torch.FloatTensor(self.grid_Y).unsqueeze(0).unsqueeze(3)
         
-        self.grid_X = Variable(grid_X,requires_grad=False)
-        self.grid_Y = Variable(grid_Y,requires_grad=False)
+        self.grid_X = Variable(self.grid_X,requires_grad=False)
+        self.grid_Y = Variable(self.grid_Y,requires_grad=False)
         if use_cuda:
             self.grid_X = self.grid_X.cuda()
             self.grid_Y = self.grid_Y.cuda()
             
-    def forward(self, theta):
+    def forward(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
         b=theta.size(0)
         if not theta.size()==(b,6):
             theta = theta.view(b,6)
@@ -84,12 +88,85 @@ class StitchingAffineGridGen(Module):
         t4=theta[:,4].unsqueeze(1).unsqueeze(2).unsqueeze(3)
         t5=theta[:,5].unsqueeze(1).unsqueeze(2).unsqueeze(3)
 
-        grid_X = expand_dim(self.grid_X,0,b)
-        grid_Y = expand_dim(self.grid_Y,0,b)
+        grid_X = custom_grid_X
+        grid_Y = custom_grid_Y
+
+        if not custom_grid:
+            grid_X = expand_dim(self.grid_X,0,b)
+            grid_Y = expand_dim(self.grid_Y,0,b)
+
         grid_Xp = grid_X*t0 + grid_Y*t1 + t2
         grid_Yp = grid_X*t3 + grid_Y*t4 + t5
         
         return torch.cat((grid_Xp,grid_Yp),3)
+ 
+    def inverse(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
+        b=theta.size(0)
+        if not theta.size()==(b,6):
+            theta = theta.view(b,6)
+            theta = theta.contiguous()
+            
+
+        t2=theta[:,2].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        t5=theta[:,5].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+
+        grid_X = custom_grid_X
+        grid_Y = custom_grid_Y
+
+        if not custom_grid:
+            grid_X = expand_dim(self.grid_X,0,b)
+            grid_Y = expand_dim(self.grid_Y,0,b)
+
+        # aff_matrix = np.array( [[t0.detach().cpu().numpy()[0,0,0,0],t1.detach().cpu().numpy()[0,0,0,0]],[t3.detach().cpu().numpy()[0,0,0,0],t4.detach().cpu().numpy()[0,0,0,0]]] )
+
+        aff_matrix = torch.cat((theta[:,:2],theta[:,3:5]),axis=1)
+        aff_matrix = torch.reshape(aff_matrix,(2,2))
+
+        aff_matrix_i = torch.linalg.inv(aff_matrix) 
+
+
+        t0=aff_matrix_i[0,0].unsqueeze(0).unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        t1=aff_matrix_i[0,1].unsqueeze(0).unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        t3=aff_matrix_i[1,0].unsqueeze(0).unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        t4=aff_matrix_i[1,1].unsqueeze(0).unsqueeze(1).unsqueeze(2).unsqueeze(3)
+
+        grid_X = grid_X - t2
+        grid_Y = grid_Y - t5
+        
+        grid_Xp = grid_X*t0 + grid_Y*t1
+        grid_Yp = grid_X*t3 + grid_Y*t4
+        
+        return torch.cat((grid_Xp,grid_Yp),3)
+    
+    def inversev2(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
+        
+        grid = self.forward(theta)
+
+        aux_grid = torch.full(grid.size(),-2)
+
+        grid_x = grid[:,:,:,0]
+        grid_y = grid[:,:,:,1]
+        grid_x = torch.mul(torch.add(grid_x,1),self.img_w/2)
+        grid_y = torch.mul(torch.add(grid_y,1),self.img_h/2)
+        
+        for b in range(grid.size(0)):
+            for h in range(grid.size(1)):
+                for w in range(grid.size(2)):
+                    aux_x = int(grid_x[b,h,w].detach().cpu().numpy())
+                    aux_y = int(grid_y[b,h,w].detach().cpu().numpy())
+
+                    if aux_x >= 0 and aux_x<grid.size(2) and aux_y>=0 and aux_y<grid.size(1):
+                        aux_grid[b,aux_y,aux_x,0] = torch.FloatTensor([((w / self.img_w)*2)-1])
+                        aux_grid[b,aux_y,aux_x,1] = torch.FloatTensor([((h/self.img_h)*2)-1])
+
+        aux_grid = aux_grid.type(torch.FloatTensor)
+
+        if (self.use_cuda):
+            aux_grid = aux_grid.cuda()
+
+        return aux_grid
+
+    
 
 class StitchingHomographyGridGen(Module):
     def __init__(self, img_h=240 , img_w=240 ,out_h=480, out_w=480, use_cuda=True):
@@ -106,7 +183,7 @@ class StitchingHomographyGridGen(Module):
             self.grid_X = self.grid_X.cuda()
             self.grid_Y = self.grid_Y.cuda()
             
-    def forward(self, theta):
+    def forward(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
         b=theta.size(0)
         # b=1
         if theta.size(1)==9:
@@ -122,9 +199,53 @@ class StitchingHomographyGridGen(Module):
         h6=H[:,6].unsqueeze(1).unsqueeze(2).unsqueeze(3)
         h7=H[:,7].unsqueeze(1).unsqueeze(2).unsqueeze(3)
         h8=H[:,8].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+
+        grid_X = custom_grid_X
+        grid_Y = custom_grid_Y
+
+        if not custom_grid:
+            grid_X = expand_dim(self.grid_X,0,b);
+            grid_Y = expand_dim(self.grid_Y,0,b);
+
+
+        grid_Xp = grid_X*h0+grid_Y*h1+h2
+        grid_Yp = grid_X*h3+grid_Y*h4+h5
+        k = grid_X*h6+grid_Y*h7+h8
+
+        grid_Xp /= k; grid_Yp /= k
         
-        grid_X = expand_dim(self.grid_X,0,b);
-        grid_Y = expand_dim(self.grid_Y,0,b);
+        return torch.cat((grid_Xp,grid_Yp),3)
+
+    def inverse(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
+        b=theta.size(0)
+        # b=1
+        if theta.size(1)==9:
+            H = theta            
+        else:
+            H = homography_mat_from_4_pts(theta)            
+        
+        H = torch.reshape(H,(3,3))        
+        H = torch.transpose(H,0,1)
+        H = torch.linalg.inv(H)
+        H = torch.transpose(H,0,1)
+        H = torch.reshape(H,(1,9))
+
+        h0=H[:,0].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h1=H[:,1].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h2=H[:,2].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h3=H[:,3].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h4=H[:,4].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h5=H[:,5].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h6=H[:,6].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h7=H[:,7].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        h8=H[:,8].unsqueeze(1).unsqueeze(2).unsqueeze(3)
+
+        grid_X = custom_grid_X
+        grid_Y = custom_grid_Y
+
+        if not custom_grid:
+            grid_X = expand_dim(self.grid_X,0,b);
+            grid_Y = expand_dim(self.grid_Y,0,b);
 
         grid_Xp = grid_X*h0+grid_Y*h1+h2
         grid_Yp = grid_X*h3+grid_Y*h4+h5
@@ -171,12 +292,13 @@ def homography_mat_from_4_pts(theta):
     return H
 
 class StitchingTpsGridGen(Module):
-    def __init__(self, img_h=240 , img_w=240 ,out_h=480, out_w=480, use_regular_grid=True, grid_size=3, 
-                    reg_factor=0, use_cuda=True):
+    def __init__(self, img_h=240, img_w=240, use_regular_grid=True, x_axis_coords=None,y_axis_coords=None , reg_factor=0, use_cuda=True):
         super(StitchingTpsGridGen, self).__init__()
-        self.out_h, self.out_w = out_h, out_w
+        # self.out_h, self.out_w = out_h, out_w
         self.reg_factor = reg_factor
         self.img_h, self.img_w = img_h, img_w
+        self.use_cuda = use_cuda
+        self.regular_grid = use_regular_grid
         self.use_cuda = use_cuda
 
         grid_X,grid_Y = genFlexPoints(img_h,img_w)
@@ -189,25 +311,48 @@ class StitchingTpsGridGen(Module):
 
         # initialize regular grid for control points P_i
         if use_regular_grid:
+            grid_size = 3
             axis_coords = np.linspace(-1,1,grid_size)
             self.N = grid_size*grid_size
             P_Y,P_X = np.meshgrid(axis_coords,axis_coords)
+            self.x_axis_coords = P_X
+            self.y_axis_coords = P_Y
             P_X = np.reshape(P_X,(-1,1)) # size (N,1)
             P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
             P_X = torch.FloatTensor(P_X)
             P_Y = torch.FloatTensor(P_Y)
-            self.Li = Variable(self.compute_L_inverse(P_X,P_Y).unsqueeze(0),requires_grad=False)
-            self.P_X = P_X.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
-            self.P_Y = P_Y.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
-            self.P_X = Variable(self.P_X,requires_grad=False)
-            self.P_Y = Variable(self.P_Y,requires_grad=False)
-            if use_cuda:
-                self.P_X = self.P_X.cuda()
-                self.P_Y = self.P_Y.cuda()
+        else:
+            self.N = len(x_axis_coords) 
+            # P_Y,P_X = np.meshgrid(y_axis_coords,x_axis_coords)
+            # P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+            # P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+            # P_X = np.reshape(np.delete(P_X,[4]),(-1,1))
+            # P_Y = np.reshape(np.delete(P_Y,[4]),(-1,1))
+            self.x_axis_coords = x_axis_coords
+            self.y_axis_coords = y_axis_coords
+            x_axis_coords = np.reshape(x_axis_coords,(-1,1))
+            y_axis_coords = np.reshape(y_axis_coords,(-1,1))
+            P_X = torch.FloatTensor(x_axis_coords)
+            P_Y = torch.FloatTensor(y_axis_coords)
+
+        self.Li = Variable(self.compute_L_inverse(P_X,P_Y).unsqueeze(0),requires_grad=False)
+        self.P_X = P_X.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_Y = P_Y.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_X = Variable(self.P_X,requires_grad=False)
+        self.P_Y = Variable(self.P_Y,requires_grad=False)
+        if use_cuda:
+            self.P_X = self.P_X.cuda()
+            self.P_Y = self.P_Y.cuda()
 
             
-    def forward(self, theta):
-        warped_grid = self.apply_transformation(theta,torch.cat((self.grid_X,self.grid_Y),3))
+    def forward(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
+        grid_X = custom_grid_X
+        grid_Y = custom_grid_Y
+        if not custom_grid:
+            grid_X = self.grid_X
+            grid_Y = self.grid_Y
+            
+        warped_grid = self.apply_transformation(theta,torch.cat((grid_X,grid_Y),3))
         
         return warped_grid
     
@@ -304,3 +449,65 @@ class StitchingTpsGridGen(Module):
                        torch.sum(torch.mul(W_Y,U.expand_as(W_Y)),4)
         
         return torch.cat((points_X_prime,points_Y_prime),3)
+
+    def inverse(self, theta,custom_grid=False,custom_grid_X = None, custom_grid_Y = None):
+        
+        auxP_X = self.P_X
+        auxP_Y = self.P_Y
+        
+        theta_np = theta[0].detach().cpu().numpy()
+
+        x_axis_coords = theta_np[:theta_np.shape[0]//2]
+        y_axis_coords = theta_np[theta_np.shape[0]//2:]
+
+        #Recalculate grid to do transformation
+        if self.regular_grid:
+            grid_size = 3
+            axis_coords = np.linspace(-1,1,grid_size)
+            self.N = grid_size*grid_size
+            P_Y,P_X = np.meshgrid(axis_coords,axis_coords)
+            P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+            P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+            P_X = torch.FloatTensor(P_X)
+            P_Y = torch.FloatTensor(P_Y)
+        else:
+            self.N = len(x_axis_coords) 
+            # P_Y,P_X = np.meshgrid(y_axis_coords,x_axis_coords)
+            # P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+            # P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+            # P_X = np.reshape(np.delete(P_X,[4]),(-1,1))
+            # P_Y = np.reshape(np.delete(P_Y,[4]),(-1,1))
+            x_axis_coords = np.reshape(x_axis_coords,(-1,1))
+            y_axis_coords = np.reshape(y_axis_coords,(-1,1))
+            P_X = torch.FloatTensor(x_axis_coords)
+            P_Y = torch.FloatTensor(y_axis_coords)
+
+        self.Li = Variable(self.compute_L_inverse(P_X,P_Y).unsqueeze(0),requires_grad=False)
+        self.P_X = P_X.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_Y = P_Y.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_X = Variable(self.P_X,requires_grad=False)
+        self.P_Y = Variable(self.P_Y,requires_grad=False)
+
+        if self.use_cuda:
+            self.P_X = self.P_X.cuda()
+            self.P_Y = self.P_Y.cuda()
+
+
+        grid_X = custom_grid_X
+        grid_Y = custom_grid_Y
+        if not custom_grid:
+            grid_X = self.grid_X
+            grid_Y = self.grid_Y
+
+
+        aux_theta = torch.FloatTensor(np.expand_dims(np.concatenate((self.x_axis_coords,self.x_axis_coords)),axis=0))   
+
+        if self.use_cuda:
+            aux_theta = aux_theta.cuda()
+            
+        warped_grid = self.apply_transformation(aux_theta,torch.cat((grid_X,grid_Y),3))
+
+        self.P_X = auxP_X
+        self.P_Y = auxP_Y
+        
+        return warped_grid

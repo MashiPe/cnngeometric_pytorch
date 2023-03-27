@@ -39,7 +39,11 @@ class SynthDataset(Dataset):
                  random_s=0.5, 
                  random_alpha=1/6, 
                  random_t_tps=0.4, 
-                 four_point_hom=True):
+                 four_point_hom=True,
+                 reg_grid=True,
+                 x_axis_coords=None,
+                 y_axis_coords=None,
+                 aff_translation=False):
     
         self.out_h, self.out_w = output_size
         # read csv file
@@ -61,7 +65,11 @@ class SynthDataset(Dataset):
         self.dataset_image_path = dataset_image_path
         self.transform = transform
         self.geometric_model = geometric_model
-        self.affineTnf = GeometricTnf(out_h=self.out_h, out_w=self.out_w, use_cuda = False) 
+        self.affineTnf = GeometricTnf(out_h=self.out_h, out_w=self.out_w, use_cuda = False)
+        self.reg_grid = reg_grid
+        self.x_axis_coords = x_axis_coords
+        self.y_axis_coords = y_axis_coords
+        self.aff_translation = aff_translation
         
     def __len__(self):
         return len(self.train_data)
@@ -88,12 +96,20 @@ class SynthDataset(Dataset):
                 theta[[0,1,2,3,4,5]] = theta[[3,2,5,1,0,4]]
         else:
             if self.geometric_model=='affine' or self.geometric_model=='afftps':
-                rot_angle = (np.random.rand(1)-0.5)*2*np.pi/12; # between -np.pi/12 and np.pi/12
-                sh_angle = (np.random.rand(1)-0.5)*2*np.pi/6; # between -np.pi/6 and np.pi/6
-                lambda_1 = 1+(2*np.random.rand(1)-1)*0.25; # between 0.75 and 1.25
-                lambda_2 = 1+(2*np.random.rand(1)-1)*0.25; # between 0.75 and 1.25
+
                 tx=(2*np.random.rand(1)-1)*0.25;  # between -0.25 and 0.25
                 ty=(2*np.random.rand(1)-1)*0.25;
+
+                if not self.aff_translation:
+                    rot_angle = (np.random.rand(1)-0.5)*2*np.pi/12; # between -np.pi/12 and np.pi/12
+                    sh_angle = (np.random.rand(1)-0.5)*2*np.pi/6; # between -np.pi/6 and np.pi/6
+                    lambda_1 = 1+(2*np.random.rand(1)-1)*0.25; # between 0.75 and 1.25
+                    lambda_2 = 1+(2*np.random.rand(1)-1)*0.25; # between 0.75 and 1.25
+                else:
+                    rot_angle = np.array([0]) #No rotation
+                    sh_angle = np.array([0]) #No rotation
+                    lambda_1 = np.array([1]) #No scaling 
+                    lambda_2 = np.array([1]) #No scaling
 
                 R_sh = np.array([[np.cos(sh_angle[0]),-np.sin(sh_angle[0])],
                                  [np.sin(sh_angle[0]),np.cos(sh_angle[0])]])
@@ -108,9 +124,19 @@ class SynthDataset(Dataset):
             if self.geometric_model=='hom':
                 theta_hom = np.array([-1, -1, 1, 1, -1, 1, -1, 1])
                 theta_hom = theta_hom+(np.random.rand(8)-0.5)*2*self.random_t_tps
-            if self.geometric_model=='tps' or self.geometric_model=='afftps':
+            if (self.geometric_model=='tps' or self.geometric_model=='afftps') and self.reg_grid:
                 theta_tps = np.array([-1 , -1 , -1 , 0 , 0 , 0 , 1 , 1 , 1 , -1 , 0 , 1 , -1 , 0 , 1 , -1 , 0 , 1])
                 theta_tps = theta_tps+(np.random.rand(18)-0.5)*2*self.random_t_tps
+                
+            if (self.geometric_model=='tps' or self.geometric_model=='afftps') and not self.reg_grid: 
+                # axis_coords = np.linspace(-1,1,self.out_cnn_dim//2)
+                # P_Y,P_X = np.meshgrid(axis_coords,axis_coords)
+                # P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+                # P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+                theta_tps = np.append(self.x_axis_coords,self.y_axis_coords)
+                # theta_tps = np.array([-1 , -1 , -1 , 0 , 0 , 1 , 1 , 1 , -1 , 0 , 1 , -1  , 1 , -1 , 0 , 1])
+                theta_tps = theta_tps+(np.random.rand(len(theta_tps))-0.5)*2*self.random_t_tps
+
             if self.geometric_model=='affine':
                 theta=theta_aff
             elif self.geometric_model=='hom':

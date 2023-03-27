@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 import torch.nn.functional as F
 from util.torch_util import expand_dim
+from geotnf.transformation import homography_mat_from_4_pts
 
 class AffineGridGen(Module):
     def __init__(self, out_h=240, out_w=240, out_ch = 3, use_cuda=True):

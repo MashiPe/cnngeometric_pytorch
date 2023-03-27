@@ -6,7 +6,7 @@ from shapely.geometry import Polygon,Point
 import scipy.ndimage as ndimage
 from sklearn.preprocessing import normalize
 from multiprocessing import Pool
-from numba import cuda,jit
+# from numba import cuda,jit
 import cv2 as cv
 from util.gpu_polygon import PolyV2
 

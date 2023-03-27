@@ -23,7 +23,7 @@ from util.train_test_fn import train, validate_model
 from util.torch_util import save_checkpoint, str_to_bool
 
 from options.options import ArgumentParser
-
+from collections import OrderedDict
 
 """
 
@@ -60,6 +60,8 @@ def main():
     print('Creating CNN model...')
     if args.geometric_model=='affine':
         cnn_output_dim = 6
+    # elif args.geometric_model=='affine' and args.translation_only:
+    #     cnn_output_dim = 2
     elif args.geometric_model=='hom' and args.four_point_hom:
         cnn_output_dim = 8
     elif args.geometric_model=='hom' and not args.four_point_hom:
@@ -67,13 +69,23 @@ def main():
     elif args.geometric_model=='tps' and args.reg_grid:
         cnn_output_dim = 18
     elif args.geometric_model=='tps' and not args.reg_grid:
-        cnn_output_dim = 16
+        cnn_output_dim = len(args.x_axis_coords)*2
 
     print("Number of out dim = ",cnn_output_dim)
 
     model = CNNGeometric(use_cuda=use_cuda,
                          output_dim=cnn_output_dim,
                          **arg_groups['model'])
+    
+    # Load pretrained model
+    if args.pretrained_model!='':
+        checkpoint = torch.load(args.pretrained_model, map_location=lambda storage, loc: storage)
+        checkpoint['state_dict'] = OrderedDict([(k.replace('vgg', 'model'), v) for k, v in checkpoint['state_dict'].items()])
+        
+        for name, param in model.FeatureExtraction.state_dict().items():
+            model.FeatureExtraction.state_dict()[name].copy_(checkpoint['state_dict']['FeatureExtraction.' + name])    
+        for name, param in model.FeatureRegression.state_dict().items():
+            model.FeatureRegression.state_dict()[name].copy_(checkpoint['state_dict']['FeatureRegression.' + name])
 
     if args.geometric_model=='hom' and not args.four_point_hom:
         init_theta = torch.tensor([1,0,0,0,1,0,0,0,1], device = device)
@@ -90,7 +102,9 @@ def main():
         print('Using grid loss...')
         loss = TransformedGridLoss(use_cuda=use_cuda,
                                    geometric_model=args.geometric_model,
-                                   reg_grid_tps=args.reg_grid)
+                                   reg_grid_tps=args.reg_grid,
+                                   x_axis_coords=args.x_axis_coords,
+                                   y_axis_coords=args.y_axis_coords)
 
     # Initialize Dataset objects
     dataset = SynthDataset(geometric_model=args.geometric_model,
@@ -99,7 +113,10 @@ def main():
 			   dataset_image_path=args.dataset_image_path,
 			   transform=NormalizeImageDict(['image']),
 			   random_sample=args.random_sample,
-               reg_grid=args.reg_grid)
+               reg_grid=args.reg_grid,
+               x_axis_coords=args.x_axis_coords,
+               y_axis_coords=args.y_axis_coords,
+               aff_translation=args.translation_only)
 
     dataset_val = SynthDataset(geometric_model=args.geometric_model,
                    dataset_csv_path=args.dataset_csv_path,
@@ -107,11 +124,15 @@ def main():
 			       dataset_image_path=args.dataset_image_path,
 			       transform=NormalizeImageDict(['image']),
 			       random_sample=args.random_sample,
-                   reg_grid=args.reg_grid)
+                   reg_grid=args.reg_grid,
+                    x_axis_coords=args.x_axis_coords,
+                    y_axis_coords=args.y_axis_coords,
+                    aff_translation=args.translation_only)
 
     # Set Tnf pair generation func
     pair_generation_tnf = SynthPairTnf(geometric_model=args.geometric_model,
-				       use_cuda=use_cuda, reg_grid= args.reg_grid,partial_occlusion=args.partial_occlusion)
+				       use_cuda=use_cuda, reg_grid= args.reg_grid,partial_occlusion=args.partial_occlusion,
+                       x_axis_coords=args.x_axis_coords,y_axis_coords=args.y_axis_coords)
 
     # Initialize DataLoaders
     dataloader = DataLoader(dataset, batch_size=args.batch_size,

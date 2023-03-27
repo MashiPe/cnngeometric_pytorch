@@ -2,9 +2,8 @@ tqdm
 opencv-python
 numpy
 pandas
-torch
-torchvision
-sklearn
+# sklearn
+scikit-learn
 scikit-image
 matplotlib
 requests
@@ -19,3 +18,6 @@ flask-cors
 cuda-python
 numba
 pyopencl
+pymongo
+torch
+torchvision

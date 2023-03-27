@@ -11,7 +11,7 @@ from random import random,randint
 from stitching.stitch import extendAxis
 from util.align_util import calcHomography, lineLineIntersection
 # import util.align_util as align
-from geotnf.transformation import HomographyGridGen,flex_grid_sample
+from geotnf.transformation import HomographyGridGen,flex_grid_sample,TpsGridGen
 from geotnf.stitching_grid_gen import StitchingHomographyGridGen
 import util.align_util as aling
 import util.blend_util as blend
@@ -120,26 +120,30 @@ def main():
 
     # flex_grid_sample(img,grid,out_h=480,out_w=480)
 
-    imgList = [ "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_1.jpg",
-                "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_2.jpg",
-                "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_3.jpg",
-                "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_4.jpg",
-                "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_5.jpg",
-                "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_6.jpg"  ]
+    # imgList = [ "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_1.jpg",
+    #             "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_2.jpg",
+    #             "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_3.jpg",
+    #             "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_4.jpg",
+    #             "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_5.jpg",
+    #             "/workspaces/GeometricCNN/apifiles/uncompressed/0e4407b0-44cc-11ed-a64d-b3a88c7b2dcc/foto_6.jpg"  ]
     
 
-    # stitcher =  ImageStitcher('hom', 'vgg','occlusion')
-    # stitcher =  ImageStitcher('aff', 'resnet101','occlusion')
-    stitcher =  ImageStitcher('tps', 'resnet101','occlusion')
+    # # stitcher =  ImageStitcher('hom', 'vgg','occlusion')
+    # # stitcher =  ImageStitcher('aff', 'resnet101','occlusion')
+    # stitcher =  ImageStitcher('tps', 'resnet101','occlusion')
 
 
-    stitcher.stitch(imgList,"/workspaces/GeometricCNN/cache")
+    # stitcher.stitch(imgList,"/workspaces/GeometricCNN/cache")
 
     
     # test_src,test_tgt = occlusion_prep_method(aux_img_src,aux_img_src,2)
 
     # cv.imwrite("occluded_src.jpg",test_src)
     # cv.imwrite("occluded_tgt.jpg",test_tgt)
+
+    grid_gen = TpsGridGen(use_regular_grid=False)
+
+    print("grid")
 
 
 if __name__ == "__main__":

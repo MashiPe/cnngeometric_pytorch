@@ -12,6 +12,8 @@ import torch.nn.functional as F
 from util.torch_util import expand_dim
 from image.normalization import normalize_image
 import math
+import random
+from geotnf.stitching_grid_gen import StitchingTpsGridGen,StitchingHomographyGridGen,StitchingAffineGridGen
 
 class ComposedGeometricTnf(object):
     """
@@ -80,7 +82,8 @@ class GeometricTnf(object):
     ( can be used with no transformation to perform bilinear resizing )        
     
     """
-    def __init__(self, geometric_model='affine', tps_grid_size=3, tps_reg_factor=0, out_h=240, out_w=240, offset_factor=None, use_cuda=True):
+    def __init__(self, geometric_model='affine', tps_reg_factor=0, out_h=240, out_w=240, offset_factor=None, use_cuda=True
+                ,reg_grid=True,x_axis_coords = None, y_axis_coords = None):
         self.out_h = out_h
         self.out_w = out_w
         self.geometric_model = geometric_model
@@ -88,14 +91,18 @@ class GeometricTnf(object):
         self.offset_factor = offset_factor
         
         if geometric_model=='affine' and offset_factor is None:
-            self.gridGen = AffineGridGen(out_h=out_h, out_w=out_w, use_cuda=use_cuda)
+            self.gridGen = StitchingAffineGridGen(out_h=out_h, out_w=out_w, use_cuda=use_cuda)
+            # self.gridGen = AffineGridGen(out_h=out_h, out_w=out_w, use_cuda=use_cuda)
         elif geometric_model=='affine' and offset_factor is not None:
             self.gridGen = AffineGridGenV2(out_h=out_h, out_w=out_w, use_cuda=use_cuda)
         elif geometric_model=='hom':
             self.gridGen = HomographyGridGen(out_h=out_h, out_w=out_w, use_cuda=use_cuda)
         elif geometric_model=='tps':
-            self.gridGen = TpsGridGen(out_h=out_h, out_w=out_w, grid_size=tps_grid_size, 
-                                      reg_factor=tps_reg_factor, use_cuda=use_cuda)
+            self.gridGen = TpsGridGenV2(out_h=out_h, out_w=out_w,reg_factor=tps_reg_factor, use_cuda=use_cuda, 
+                                        use_regular_grid=reg_grid, x_axis_coords=x_axis_coords,y_axis_coords=y_axis_coords)
+            # self.gridGen = StitchingTpsGridGen(out_h=out_h, out_w=out_w,reg_factor=tps_reg_factor, use_cuda=use_cuda, 
+            #                             use_regular_grid=reg_grid, x_axis_coords=x_axis_coords,y_axis_coords=y_axis_coords)
+
         if offset_factor is not None:
             self.gridGen.grid_X=self.gridGen.grid_X/offset_factor
             self.gridGen.grid_Y=self.gridGen.grid_Y/offset_factor   
@@ -104,7 +111,17 @@ class GeometricTnf(object):
         if use_cuda:
             self.theta_identity = self.theta_identity.cuda()
 
-    def __call__(self, image_batch, theta_batch=None, out_h=None, out_w=None, return_warped_image=True, return_sampling_grid=False, padding_factor=1.0, crop_factor=1.0):
+    def __call__(self, 
+                image_batch, 
+                theta_batch=None, 
+                out_h=None, 
+                out_w=None, 
+                return_warped_image=True, 
+                return_sampling_grid=False, 
+                padding_factor=1.0, 
+                crop_factor=1.0,
+                inverse=False,
+                indirect = False):
         if image_batch is None:
             b=1
         else:
@@ -126,6 +143,12 @@ class GeometricTnf(object):
             gridGen = self.gridGen
         
         sampling_grid = gridGen(theta_batch)
+
+        if inverse and not indirect:
+            sampling_grid = gridGen.inverse(theta_batch)
+
+        if indirect and indirect:
+            sampling_grid = gridGen.inversev2(theta_batch)
 
         # print("Sampling Grid: " + self.geometric_model)
         # print(sampling_grid.size())
@@ -157,7 +180,8 @@ class SynthPairTnf(object):
     Generate a synthetically warped training pair using an affine transformation.
     
     """
-    def __init__(self, use_cuda=True, geometric_model='affine', crop_factor=9/16, output_size=(240,240), padding_factor = 0.5, occlusion_factor=0):
+    def __init__(self, use_cuda=True, geometric_model='affine', crop_factor=9/16, output_size=(240,240), padding_factor = 0.5, occlusion_factor=0 , 
+                reg_grid=True, partial_occlusion=False,x_axis_coords=None,y_axis_coords=None):
         assert isinstance(use_cuda, (bool))
         assert isinstance(crop_factor, (float))
         assert isinstance(output_size, (tuple))
@@ -166,11 +190,13 @@ class SynthPairTnf(object):
         self.use_cuda=use_cuda
         self.crop_factor = crop_factor
         self.padding_factor = padding_factor
-        self.out_h, self.out_w = output_size 
+        self.out_h, self.out_w = output_size
+        self.partial_occlusion=partial_occlusion
         self.rescalingTnf = GeometricTnf('affine', out_h=self.out_h, out_w=self.out_w, 
                                          use_cuda = self.use_cuda)
         self.geometricTnf = GeometricTnf(geometric_model, out_h=self.out_h, out_w=self.out_w, 
-                                         use_cuda = self.use_cuda)
+                                         reg_grid=reg_grid,use_cuda = self.use_cuda,
+                                         x_axis_coords=x_axis_coords,y_axis_coords=y_axis_coords)
 
         
     def __call__(self, batch):
@@ -216,7 +242,51 @@ class SynthPairTnf(object):
             # apply mask
             cropped_image_batch = torch.mul(cropped_image_batch,1-mask_1)+torch.mul(cropped_image_batch[rolled_indices_1,:],mask_1)
             warped_image_batch = torch.mul(warped_image_batch,1-mask_2)+torch.mul(warped_image_batch[rolled_indices_1,:],mask_2)
-        
+
+        if self.partial_occlusion:
+
+            img_height = self.out_h
+            img_width = self.out_w
+            
+            percentage = random.uniform(0.3,0.6)
+            # percentage = 0.5
+
+            flex_width = random.randint(0,1)
+            up = random.randint(0,1)
+            left = random.randint(0,1)
+
+            if (flex_width == 1):
+                new_height = random.randint( int(0.3*img_height),img_height )
+                new_width = int((img_height*img_width*percentage)/new_height)
+            else:    
+                new_width = random.randint( int(0.3*img_width),img_width )
+                new_height = int((img_height*img_width*percentage)/new_width)
+
+            # b = warped_image_batch.size(0)
+
+
+            if (up == 1):
+                start_y = 0
+            else:
+                start_y = img_height - new_height
+            
+            if (left == 1):
+                start_x = 0
+            else:
+                start_x = img_width - new_width
+
+            black_var = torch.zeros(warped_image_batch.size())
+            black_var = Variable(black_var)
+            
+            cropped_image_batch[:,:,start_y:start_y+new_height , start_x:start_x+new_width] = black_var[:,:,start_y:start_y+new_height , start_x:start_x+new_width]
+            warped_image_batch[:,:,start_y:start_y+new_height , start_x:start_x+new_width] = black_var[:,:,start_y:start_y+new_height , start_x:start_x+new_width]
+
+            # for img_i in range(b):
+            #     cropped_img = normalize_image(cropped_image_batch[img_i],forward=False).data.squeeze(0).transpose(0,1).transpose(1,2).detach().cpu().numpy()
+            #     warped_img = normalize_image(warped_image_batch[img_i],forward=False).data.squeeze(0).transpose(0,1).transpose(1,2).detach().cpu().numpy()
+            #     io.imsave('cache/cropped'+str(img_i)+'.jpg',cropped_img)
+            #     io.imsave('cache/warped'+str(img_i)+'.jpg',warped_img)
+
         return {'source_image': cropped_image_batch, 'target_image': warped_image_batch, 'theta_GT': theta_batch}
         
 
@@ -586,17 +656,30 @@ class TpsGridGen(Module):
             P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
             P_X = torch.FloatTensor(P_X)
             P_Y = torch.FloatTensor(P_Y)
-            self.Li = Variable(self.compute_L_inverse(P_X,P_Y).unsqueeze(0),requires_grad=False)
-            self.P_X = P_X.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
-            self.P_Y = P_Y.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
-            self.P_X = Variable(self.P_X,requires_grad=False)
-            self.P_Y = Variable(self.P_Y,requires_grad=False)
-            if use_cuda:
-                self.P_X = self.P_X.cuda()
-                self.P_Y = self.P_Y.cuda()
+        else:
+            axis_coords = np.linspace(-1,1,grid_size)
+            self.N = (grid_size*grid_size) -1 
+            P_Y,P_X = np.meshgrid(axis_coords,axis_coords)
+            P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+            P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+            P_X = np.reshape(np.delete(P_X,[4]),(-1,1))
+            P_Y = np.reshape(np.delete(P_Y,[4]),(-1,1))
+            P_X = torch.FloatTensor(P_X)
+            P_Y = torch.FloatTensor(P_Y)
 
-            
+        self.Li = Variable(self.compute_L_inverse(P_X,P_Y).unsqueeze(0),requires_grad=False)
+        self.P_X = P_X.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_Y = P_Y.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_X = Variable(self.P_X,requires_grad=False)
+        self.P_Y = Variable(self.P_Y,requires_grad=False)
+        if use_cuda:
+            self.P_X = self.P_X.cuda()
+            self.P_Y = self.P_Y.cuda()
+
+
     def forward(self, theta):
+        # np_theta = theta.detach().cpu().numpy()
+    
         warped_grid = self.apply_transformation(theta,torch.cat((self.grid_X,self.grid_Y),3))
         
         return warped_grid
@@ -696,10 +779,171 @@ class TpsGridGen(Module):
         return torch.cat((points_X_prime,points_Y_prime),3)
         
 
+class TpsGridGenV2(Module):
+    def __init__(self, out_h=240, out_w=240, use_regular_grid=True, x_axis_coords=None,y_axis_coords=None , reg_factor=0, use_cuda=True):
+        super(TpsGridGenV2, self).__init__()
+        self.out_h, self.out_w = out_h, out_w
+        self.reg_factor = reg_factor
+        self.use_cuda = use_cuda
+
+        # create grid in numpy
+        # self.grid = np.zeros( [self.out_h, self.out_w, 3], dtype=np.float32)
+        # sampling grid with dim-0 coords (Y)
+        self.grid_X,self.grid_Y = np.meshgrid(np.linspace(-1,1,out_w),np.linspace(-1,1,out_h))
+        # grid_X,grid_Y: size [1,H,W,1,1]
+        self.grid_X = torch.FloatTensor(self.grid_X).unsqueeze(0).unsqueeze(3)
+        self.grid_Y = torch.FloatTensor(self.grid_Y).unsqueeze(0).unsqueeze(3)
+        self.grid_X = Variable(self.grid_X,requires_grad=False)
+        self.grid_Y = Variable(self.grid_Y,requires_grad=False)
+        if use_cuda:
+            self.grid_X = self.grid_X.cuda()
+            self.grid_Y = self.grid_Y.cuda()
+
+        # initialize regular grid for control points P_i
+        if use_regular_grid:
+            grid_size = 3
+            axis_coords = np.linspace(-1,1,grid_size)
+            self.N = grid_size*grid_size
+            P_Y,P_X = np.meshgrid(axis_coords,axis_coords)
+            P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+            P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+            P_X = torch.FloatTensor(P_X)
+            P_Y = torch.FloatTensor(P_Y)
+        else:
+            self.N = len(x_axis_coords) 
+            # P_Y,P_X = np.meshgrid(y_axis_coords,x_axis_coords)
+            # P_X = np.reshape(P_X,(-1,1)) # size (N,1)
+            # P_Y = np.reshape(P_Y,(-1,1)) # size (N,1)
+            # P_X = np.reshape(np.delete(P_X,[4]),(-1,1))
+            # P_Y = np.reshape(np.delete(P_Y,[4]),(-1,1))
+            x_axis_coords = np.reshape(x_axis_coords,(-1,1))
+            y_axis_coords = np.reshape(y_axis_coords,(-1,1))
+            P_X = torch.FloatTensor(x_axis_coords)
+            P_Y = torch.FloatTensor(y_axis_coords)
+
+        self.Li = Variable(self.compute_L_inverse(P_X,P_Y).unsqueeze(0),requires_grad=False)
+        self.P_X = P_X.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_Y = P_Y.unsqueeze(2).unsqueeze(3).unsqueeze(4).transpose(0,4)
+        self.P_X = Variable(self.P_X,requires_grad=False)
+        self.P_Y = Variable(self.P_Y,requires_grad=False)
+        if use_cuda:
+            self.P_X = self.P_X.cuda()
+            self.P_Y = self.P_Y.cuda()
+
+
+    def forward(self, theta):
+        # np_theta = theta.detach().cpu().numpy()
+    
+        warped_grid = self.apply_transformation(theta,torch.cat((self.grid_X,self.grid_Y),3))
+        
+        return warped_grid
+    
+    def compute_L_inverse(self,X,Y):
+        N = X.size()[0] # num of points (along dim 0)
+        # construct matrix K
+        Xmat = X.expand(N,N)
+        Ymat = Y.expand(N,N)
+        P_dist_squared = torch.pow(Xmat-Xmat.transpose(0,1),2)+torch.pow(Ymat-Ymat.transpose(0,1),2)
+        P_dist_squared[P_dist_squared==0]=1 # make diagonal 1 to avoid NaN in log computation
+        K = torch.mul(P_dist_squared,torch.log(P_dist_squared))
+        if self.reg_factor != 0:
+            K+=torch.eye(K.size(0),K.size(1))*self.reg_factor
+        # construct matrix L
+        O = torch.FloatTensor(N,1).fill_(1)
+        Z = torch.FloatTensor(3,3).fill_(0)       
+        P = torch.cat((O,X,Y),1)
+        L = torch.cat((torch.cat((K,P),1),torch.cat((P.transpose(0,1),Z),1)),0)
+        Li = torch.inverse(L)
+        if self.use_cuda:
+            Li = Li.cuda()
+        return Li
+        
+    def apply_transformation(self,theta,points):
+        if theta.dim()==2:
+            theta = theta.unsqueeze(2).unsqueeze(3)
+        # points should be in the [B,H,W,2] format,
+        # where points[:,:,:,0] are the X coords  
+        # and points[:,:,:,1] are the Y coords  
+        
+        # input are the corresponding control points P_i
+        batch_size = theta.size()[0]
+        # split theta into point coordinates
+        Q_X=theta[:,:self.N,:,:].squeeze(3)
+        Q_Y=theta[:,self.N:,:,:].squeeze(3)
+        
+        print("Q_X",Q_X)
+        print("Q_Y",Q_Y)
+
+
+        # get spatial dimensions of points
+        points_b = points.size()[0]
+        points_h = points.size()[1]
+        points_w = points.size()[2]
+        
+        # repeat pre-defined control points along spatial dimensions of points to be transformed
+        P_X = self.P_X.expand((1,points_h,points_w,1,self.N))
+        P_Y = self.P_Y.expand((1,points_h,points_w,1,self.N))
+
+        print("P_X",P_X)
+        print("P_Y",P_Y)
+        
+        # compute weigths for non-linear part
+        W_X = torch.bmm(self.Li[:,:self.N,:self.N].expand((batch_size,self.N,self.N)),Q_X)
+        W_Y = torch.bmm(self.Li[:,:self.N,:self.N].expand((batch_size,self.N,self.N)),Q_Y)
+        # reshape
+        # W_X,W,Y: size [B,H,W,1,N]
+        W_X = W_X.unsqueeze(3).unsqueeze(4).transpose(1,4).repeat(1,points_h,points_w,1,1)
+        W_Y = W_Y.unsqueeze(3).unsqueeze(4).transpose(1,4).repeat(1,points_h,points_w,1,1)
+        # compute weights for affine part
+        A_X = torch.bmm(self.Li[:,self.N:,:self.N].expand((batch_size,3,self.N)),Q_X)
+        A_Y = torch.bmm(self.Li[:,self.N:,:self.N].expand((batch_size,3,self.N)),Q_Y)
+        # reshape
+        # A_X,A,Y: size [B,H,W,1,3]
+        A_X = A_X.unsqueeze(3).unsqueeze(4).transpose(1,4).repeat(1,points_h,points_w,1,1)
+        A_Y = A_Y.unsqueeze(3).unsqueeze(4).transpose(1,4).repeat(1,points_h,points_w,1,1)
+        
+        # compute distance P_i - (grid_X,grid_Y)
+        # grid is expanded in point dim 4, but not in batch dim 0, as points P_X,P_Y are fixed for all batch
+        points_X_for_summation = points[:,:,:,0].unsqueeze(3).unsqueeze(4).expand(points[:,:,:,0].size()+(1,self.N))
+        points_Y_for_summation = points[:,:,:,1].unsqueeze(3).unsqueeze(4).expand(points[:,:,:,1].size()+(1,self.N))
+        
+        if points_b==1:
+            delta_X = points_X_for_summation-P_X
+            delta_Y = points_Y_for_summation-P_Y
+        else:
+            # use expanded P_X,P_Y in batch dimension
+            delta_X = points_X_for_summation-P_X.expand_as(points_X_for_summation)
+            delta_Y = points_Y_for_summation-P_Y.expand_as(points_Y_for_summation)
+            
+        dist_squared = torch.pow(delta_X,2)+torch.pow(delta_Y,2)
+        # U: size [1,H,W,1,N]
+        dist_squared[dist_squared==0]=1 # avoid NaN in log computation
+        U = torch.mul(dist_squared,torch.log(dist_squared)) 
+        
+        # expand grid in batch dimension if necessary
+        points_X_batch = points[:,:,:,0].unsqueeze(3)
+        points_Y_batch = points[:,:,:,1].unsqueeze(3)
+        if points_b==1:
+            points_X_batch = points_X_batch.expand((batch_size,)+points_X_batch.size()[1:])
+            points_Y_batch = points_Y_batch.expand((batch_size,)+points_Y_batch.size()[1:])
+        
+        points_X_prime = A_X[:,:,:,:,0]+ \
+                       torch.mul(A_X[:,:,:,:,1],points_X_batch) + \
+                       torch.mul(A_X[:,:,:,:,2],points_Y_batch) + \
+                       torch.sum(torch.mul(W_X,U.expand_as(W_X)),4)
+                    
+        points_Y_prime = A_Y[:,:,:,:,0]+ \
+                       torch.mul(A_Y[:,:,:,:,1],points_X_batch) + \
+                       torch.mul(A_Y[:,:,:,:,2],points_Y_batch) + \
+                       torch.sum(torch.mul(W_Y,U.expand_as(W_Y)),4)
+        
+        return torch.cat((points_X_prime,points_Y_prime),3)
 
 
 def flex_grid_sample(image,grid,real_h=240,real_w=240):
 
+    h_limit = image.shape[0]
+    w_limit = image.shape[1]
 
     iw = grid.shape[1]
     ih = grid.shape[0]
@@ -716,8 +960,21 @@ def flex_grid_sample(image,grid,real_h=240,real_w=240):
 
     output = np.zeros((out_h,out_w,c))
     
-    ix = ( (ix+1)/2 )*real_w
-    iy = ( (iy+1)/2 )*real_h
+    ix = ( (ix+1)/2 )*real_h
+    iy = ( (iy+1)/2 )*real_w
+
+    #This shift accounts for the information available in the image in case that the given image
+    #is bigger than the reference zone of te transformation
+    # Ex: If the reference zone is a (240,240) square and an image with same dimentions then in 
+    # the normalize space we have the information from -1 to 1, but if the image is bigger than the
+    # reference zone then we have information beyond -1 to 1. Assuming a symmetrical diference
+    # betwen the zone and the image adding that diference accounts for the extra information
+    # in the real image.
+    x_shift = (w_limit-real_w)//2
+    y_shift = (h_limit-real_h)//2
+
+    ix+=x_shift
+    iy+=y_shift
 
     # np.savetxt("ix-{}.csv".format(iw),ix,delimiter=",")    
     # np.savetxt("iy-{}.csv".format(ih),iy,delimiter=",")    
@@ -742,17 +999,17 @@ def flex_grid_sample(image,grid,real_h=240,real_w=240):
     for h in range(ih):
         for w in range(iw):
 
-            nw_val = (image[int(ix_nw[h,w]),int(iy_nw[h,w])] if int(ix_nw[h,w])>=0 and int(ix_nw[h,w])<real_w and  
-                            int(iy_nw[h,w])>=0 and int(iy_nw[h,w])<real_h else np.zeros((c)))
+            nw_val = (image[int(ix_nw[h,w]),int(iy_nw[h,w])] if int(ix_nw[h,w])>=0 and int(ix_nw[h,w])<w_limit and  
+                            int(iy_nw[h,w])>=0 and int(iy_nw[h,w])<h_limit else np.zeros((c)))
 
-            ne_val = (image[int(ix_ne[h,w]),int(iy_ne[h,w])] if int(ix_ne[h,w])>=0 and int(ix_ne[h,w])<real_w and  
-                            int(iy_ne[h,w])>=0 and int(iy_ne[h,w])<real_h else np.zeros((c)))
+            ne_val = (image[int(ix_ne[h,w]),int(iy_ne[h,w])] if int(ix_ne[h,w])>=0 and int(ix_ne[h,w])<w_limit and  
+                            int(iy_ne[h,w])>=0 and int(iy_ne[h,w])<h_limit else np.zeros((c)))
 
-            sw_val = (image[int(ix_sw[h,w]),int(iy_sw[h,w])] if int(ix_sw[h,w])>=0 and int(ix_sw[h,w])<real_w and
-                            int(iy_sw[h,w])>=0 and int(iy_sw[h,w])<real_h else np.zeros((c)))
+            sw_val = (image[int(ix_sw[h,w]),int(iy_sw[h,w])] if int(ix_sw[h,w])>=0 and int(ix_sw[h,w])<w_limit and
+                            int(iy_sw[h,w])>=0 and int(iy_sw[h,w])<h_limit else np.zeros((c)))
 
-            se_val = (image[int(ix_se[h,w]),int(iy_se[h,w])] if int(ix_se[h,w])>=0 and int(ix_se[h,w])<real_w and
-                            int(iy_se[h,w])>=0 and int(iy_se[h,w])<real_h else np.zeros((c)))
+            se_val = (image[int(ix_se[h,w]),int(iy_se[h,w])] if int(ix_se[h,w])>=0 and int(ix_se[h,w])<w_limit and
+                            int(iy_se[h,w])>=0 and int(iy_se[h,w])<h_limit else np.zeros((c)))
 
             out_val = nw_val * nw[h,w] +ne_val*ne[h,w] + sw_val * sw[h,w] + se_val*se[h,w]
 

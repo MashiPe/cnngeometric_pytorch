@@ -74,9 +74,14 @@ class ArgumentParser():
         train_params.add_argument('--seed', type=int, default=1, help='Pseudo-RNG seed')
         train_params.add_argument('--use-mse-loss', type=str_to_bool, nargs='?', const=True, default=False, help='Use MSE loss on tnf. parameters')        
         train_params.add_argument('--geometric-model', type=str, default='affine', help='affine/hom/tps')
+        train_params.add_argument('--reg-grid', type=str_to_bool, nargs='?', const=True, default=True, help='set behavior of TPS control points')
+        train_params.add_argument('--translation-only', type=str_to_bool, nargs='?', const=True, default=False, help='set behavior of affine transformation')
+        train_params.add_argument('--x-axis-coords', type=float, nargs='*', default=[-1,-1,-1,0,0,0,1,1,1], help='Control points X coordinates for TPS')
+        train_params.add_argument('--y-axis-coords', type=float, nargs='*', default=[-1,0,1,-1,0,1,-1,0,1], help='Control points y coordniates for TPS')
         # Trained model parameters
         train_params.add_argument('--trained-model-fn', type=str, default='checkpoint_adam', help='trained model filename')
         train_params.add_argument('--trained-model-dir', type=str, default='trained_models', help='path to trained models folder')
+        train_params.add_argument('--pretrained-model', type=str, default='', help='pretrained model')
         # Dataset name (used for loading defaults)
         train_params.add_argument('--training-dataset', type=str, default='pascal', help='dataset to use for training')
         # Limit train/test dataset sizes
@@ -90,6 +95,7 @@ class ArgumentParser():
         train_params.add_argument('--update-bn-buffers', type=str_to_bool, nargs='?', const=True, default=False, help='Update batch norm running mean and std')        
         # Train with occlusion
         train_params.add_argument('--occlusion-factor', type=float, default=0, help='occlusion factor for training')
+        train_params.add_argument('--partial-occlusion', type=str_to_bool,nargs='?',const=False,default=False, help='partial oclussion for training')
         # log parameters
         train_params.add_argument('--log_interval', type=int, default=100,
                         help='Number of iterations between logs')
