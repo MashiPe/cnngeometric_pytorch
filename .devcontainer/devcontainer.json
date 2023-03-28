@@ -18,5 +18,5 @@
         }
 	},
     "runArgs": [ "--gpus","all","--ipc","host","-v","/home/marcelo/toursVirtuales:/images",
-    "-v","/home/marcelo/Workspace/3DSpace/NetworkDatasets:/"]
+    "-v","/home/marcelo/Workspace/3DSpace/NetworkDatasets:/NetworkDatasets"]
 }
