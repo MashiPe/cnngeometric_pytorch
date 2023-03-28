@@ -16,7 +16,7 @@ WORKDIR /
 
 RUN apt-get install ffmpeg libsm6 libxext6 -y
 
-RUN apt install -y git
+RUN apt install -y git git-lfs
 
 RUN apt install -y apt-utils unzip \
     tar \

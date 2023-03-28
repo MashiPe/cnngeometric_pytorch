@@ -8,7 +8,7 @@ scripts/
 datasets/
 notebooks/
 results/
-trained_models/
+# trained_models/
 .local/
 .jupyter/
 **/*.bak
