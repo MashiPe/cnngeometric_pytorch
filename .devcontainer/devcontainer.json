@@ -17,5 +17,6 @@
                             ,"yzane.markdown-pdf","yzhang.markdown-all-in-one"]
         }
 	},
-    "runArgs": [ "--gpus","all","--ipc","host","-v","/home/marcelo/toursVirtuales:/images"]
+    "runArgs": [ "--gpus","all","--ipc","host","-v","/home/marcelo/toursVirtuales:/images",
+    "-v","/home/marcelo/Workspace/3DSpace/NetworkDatasets:/"]
 }

@@ -21,6 +21,6 @@ trained_models/
 stitchedImages
 apifiles
 cache
-.devcontainer/
+# .devcontainer/
 *.jpg
 *.csv
